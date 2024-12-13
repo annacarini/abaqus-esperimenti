@@ -5,6 +5,7 @@ from driverUtils import *
 from caeModules import *
 import mesh
 import numpy as np
+from matplotlib import pyplot as plt
 import json
 
 
@@ -65,6 +66,61 @@ class Simulation2D:
 
 
 
+    def plotLastraPoints(self, onlyExternal = False, frameIndex=-1):
+        job_path = str(self.index) + '/Job_' + str(self.index) + '.odb'
+        odb = session.openOdb(job_path)
+
+        if (onlyExternal):
+            outputRegion = odb.rootAssembly.instances['LASTRA'].nodeSets['SURFACE-ALL']
+        else:
+            outputRegion = odb.rootAssembly.instances['LASTRA'].nodeSets['SET-ALL']
+
+        frame = odb.steps['Step-1'].frames[frameIndex]
+
+        points = frame.fieldOutputs['COORD']
+
+        points = points.getSubset(region=outputRegion)
+        points_coords = []
+        for v in points.values:
+            points_coords.append( [v.nodeLabel, v.data[0], v.data[1]] )
+
+        xs = [p[1] for p in points_coords]
+        ys = [p[2] for p in points_coords]
+        
+        fig = plt.figure()
+        plt.scatter(xs, ys)
+        plt.title("Simulation " + str(self.index) + ", Frame " + str(frameIndex))
+
+
+    # STATICA, gli passi l'indice della simulazione
+    @staticmethod
+    def plotLastraPointsStatic(index, onlyExternal = False, frameIndex=-1):
+        job_path = str(index) + '/Job_' + str(index) + '.odb'
+        odb = session.openOdb(job_path)
+
+        if (onlyExternal):
+            outputRegion = odb.rootAssembly.instances['LASTRA'].nodeSets['SURFACE-ALL']
+        else:
+            outputRegion = odb.rootAssembly.instances['LASTRA'].nodeSets['SET-ALL']
+
+        frame = odb.steps['Step-1'].frames[frameIndex]
+
+        points = frame.fieldOutputs['COORD']
+
+        points = points.getSubset(region=outputRegion)
+        points_coords = []
+        for v in points.values:
+            points_coords.append( [v.nodeLabel, v.data[0], v.data[1]] )
+
+        xs = [p[1] for p in points_coords]
+        ys = [p[2] for p in points_coords]
+        
+        fig = plt.figure()
+        plt.scatter(xs, ys)
+        plt.title("Simulation " + str(index) + ", Frame " + str(frameIndex))
+
+
+
     def runSimulation(self, saveInputData=True, saveDisplacementCSV=True, saveStressCSV=True, saveDatabase=False, saveJobInput=False):
 
         # spostati dentro la cartella folder_name
@@ -101,6 +157,10 @@ class Simulation2D:
         part_lastra.Set(name='surface-bottom', edges=part_lastra.edges.findAt(coordinates=((0, -self.LASTRA_HEIGHT/2, 0), )))
         part_lastra.Set(name='surface-left', edges=part_lastra.edges.findAt(coordinates=((-self.LASTRA_WIDTH/2, 0, 0), )))
         part_lastra.Set(name='surface-right', edges=part_lastra.edges.findAt(coordinates=((self.LASTRA_WIDTH/2, 0, 0), )))
+
+        # set tutti i nodi esterni, per l'output
+        part_lastra.SetByBoolean(name='surface-all', sets=(part_lastra.sets['surface-top'], part_lastra.sets['surface-bottom'],
+                                                           part_lastra.sets['surface-left'], part_lastra.sets['surface-right'] ))
 
 
         #----------- crea PARTI e SET: PALLA -----------#
@@ -161,7 +221,7 @@ class Simulation2D:
                                             timePeriod=self.TIME_PERIOD, timeIncrementationMethod=abaqusConstants.AUTOMATIC_GLOBAL)
 
         # specifica quali campi vogliamo in output e la frequenza
-        field = model.FieldOutputRequest('F-Output-1', createStepName='Step-1', variables=('S', 'E', 'U'), frequency=self.OUTPUT_FREQUENCY)
+        field = model.FieldOutputRequest('F-Output-1', createStepName='Step-1', variables=('S', 'E', 'U', 'COORD'), frequency=self.OUTPUT_FREQUENCY)
 
 
 
@@ -255,22 +315,33 @@ class Simulation2D:
             
             # Regione di cui vogliamo i valori
             outputRegion = odb.rootAssembly.instances['LASTRA'].nodeSets['SET-ALL']
+            
+            outputRegionExternal = odb.rootAssembly.instances['LASTRA'].nodeSets['SURFACE-ALL']
+
 
             if (saveDisplacementCSV):
                 # Ottieni il displacement solo della regione interessata e salvati i valori dentro un array
                 displacement = lastFrame.fieldOutputs['U']
-                displacement = displacement.getSubset(region=outputRegion)
 
+                # tutta la lastra
+                displacement_all = displacement.getSubset(region=outputRegion)
                 displacement_data = []
-                for v in displacement.values:
+                for v in displacement_all.values:
                     displacement_data.append( [v.nodeLabel, v.data[0], v.data[1]] )
-
                 displacement_data_np = np.array(displacement_data)
                 np.savetxt(str(self.index) + '_output_displacement.csv', displacement_data_np, delimiter=',', comments='')
 
+                # solo la frontiera                
+                displacement_external = displacement.getSubset(region=outputRegionExternal)
+                displacement_data = []
+                for v in displacement_external.values:
+                    displacement_data.append( [v.nodeLabel, v.data[0], v.data[1]] )
+                displacement_data_np = np.array(displacement_data)
+                np.savetxt(str(self.index) + '_output_displacement_external.csv', displacement_data_np, delimiter=',', comments='')
+                
+
             if (saveStressCSV):
                 stress = lastFrame.fieldOutputs['S']
-                #stress = stress.getSubset(region=outputRegion)
                 stress = stress.getScalarField(componentLabel='S11')
 
                 stress_data = []
@@ -300,3 +371,4 @@ class Simulation2D:
 
         # rispostati al path precedente
         os.chdir(previous_path)
+
