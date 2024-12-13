@@ -51,6 +51,8 @@ class Simulation2D:
         self.folder_name = str(index)
         os.makedirs(self.folder_name, exist_ok=True)
 
+        self.simulationHasRun = False
+
 
 
     def _saveInputDataToFile(self):
@@ -67,8 +69,12 @@ class Simulation2D:
 
 
     def plotLastraPoints(self, onlyExternal = False, frameIndex=-1):
+        
+        if (not self.simulationHasRun):
+            return
+
         job_path = str(self.index) + '/Job_' + str(self.index) + '.odb'
-        odb = session.openOdb(job_path)
+        odb = session.openOdb(job_path) # qua dovremmo assicurarci che esista
 
         if (onlyExternal):
             outputRegion = odb.rootAssembly.instances['LASTRA'].nodeSets['SURFACE-ALL']
@@ -96,7 +102,7 @@ class Simulation2D:
     @staticmethod
     def plotLastraPointsStatic(index, onlyExternal = False, frameIndex=-1):
         job_path = str(index) + '/Job_' + str(index) + '.odb'
-        odb = session.openOdb(job_path)
+        odb = session.openOdb(job_path) # qua dovremmo assicurarci che esista
 
         if (onlyExternal):
             outputRegion = odb.rootAssembly.instances['LASTRA'].nodeSets['SURFACE-ALL']
@@ -301,6 +307,7 @@ class Simulation2D:
         # submit the job:
         job.submit()
         job.waitForCompletion()
+        self.simulationHasRun = True
         
 
         #----------- SALVA OUTPUT IN FILE CSV -----------#

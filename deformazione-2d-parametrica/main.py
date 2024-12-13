@@ -49,7 +49,7 @@ def main():
             index += 1
     '''
 
-    # Plot della simulazione 0 direttamente caricando l'output db gia' generato
+    # Plot della simulazione 0, direttamente caricando l'output database gia' generato
     Simulation2D.plotLastraPointsStatic(0, onlyExternal=False, frameIndex=0)       # tutti i punti, all'INIZIO della simulazione 0
     Simulation2D.plotLastraPointsStatic(0, onlyExternal=False, frameIndex=-1)      # tutti i punti, alla FINE della simulazione 0
 
