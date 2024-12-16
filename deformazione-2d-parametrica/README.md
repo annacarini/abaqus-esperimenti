@@ -1,5 +1,5 @@
-Le simulazioni si avviano creando un oggetto di tipo _Simulation2D_ definito dentro _Simulation2D.py_.
-Dentro _main.py_ c'è un loop che fa partire alcune simulazioni variando la velocità della palla.
+Le simulazioni si avviano creando un oggetto di tipo _Simulation2D_ definito dentro _Simulation2D_MRK1.py_.
+Dentro _Main_MRK1.py_ c'è un loop che fa partire alcune simulazioni variando la velocità della palla.
 
 Ogni simulazione ha un indice (0, 1...), e i file relativi a quella simulazione vengono generati dentro una cartella di nome "Dynamic_Simulation_\<index>".
 
