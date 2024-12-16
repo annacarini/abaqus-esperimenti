@@ -9,4 +9,4 @@ Per ogni simulazione vengono generati quattro file:
 - **\<index>_output_displacement_external.csv:** file in cui ogni riga ha questo formato: "\<node label>, \<displacement lungo asse x>, \<displacement lungo asse y>", e sono presenti solo informazioni sui nodi sulla frontiera
 - **\<index>_output_stress.csv:** file in cui ogni riga ha questo formato: "\<element label>, \<stress>"
 
-La cartella 0 contiene un esempio di questi file.
+La cartella Dynamic_Simulation_0 contiene un esempio di questi file.
