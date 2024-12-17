@@ -40,8 +40,8 @@ class DisplacementDataset(Dataset):
                         json_path = os.path.join(subfolder_path, f"Dynamic_Simulation_{index}_input.json")
 
                         # Load CSV (ground truth)
-                        ground_truth = pd.read_csv(csv_path).values
-
+                        ground_truth = pd.read_csv(csv_path).values[:,1:3] #scarto la prima colonna
+                        import pdb; pdb.set_trace()
                         # Load JSON (input features)
                         with open(json_path, "r") as f:
                             input_features = json.load(f)

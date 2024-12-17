@@ -123,18 +123,16 @@ def main():
     #plotting an example
     input,target = test_dataset[0]
     target = train_dataset._unnormalize_features(target,train_dataset.gt_mean,train_dataset.gt_std)
-    target = target.numpy().reshape(-1, 3)
+    target = target.numpy().reshape(-1, 2)
     model.eval()
     with torch.no_grad():
         prediction = model(input.unsqueeze(0))  # Add batch dimension
         prediction = train_dataset._unnormalize_features(prediction,train_dataset.gt_mean,train_dataset.gt_std)
-        prediction = prediction.cpu().numpy().reshape(-1, 3)  # Reshape to (139, 3)
-        # Create a 2D scatter plot
-    # Ignore the Z-axis for 2D plotting
-    target_2d = target[:, :2]  # Select only X and Y
-    prediction_2d = prediction[:, :2]  # Select only X and Y
+        prediction = prediction.cpu().numpy().reshape(-1, 2)  # Reshape to (139, 2)
+    
+    # Create a 2D scatter plot
     # Generate the plot
-    fig = plot_2d_ground_truth_vs_prediction(target_2d, prediction_2d)
+    fig = plot_2d_ground_truth_vs_prediction(target, prediction)
     # Log the plot to TensorBoard
     writer.add_figure('3D Plot/Ground Truth vs Prediction', fig, global_step=num_epochs)
     # Close TensorBoard writer after training
