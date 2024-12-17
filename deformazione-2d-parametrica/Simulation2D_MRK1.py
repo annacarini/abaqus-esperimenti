@@ -490,9 +490,10 @@ class Simulation2D():
             
             file_path = JOB_NAME + file_ex
             if os.path.exists(file_path):
-                
-                os.remove(file_path)
-                
+                try:
+                    os.remove(file_path)
+                except:
+                    pass            
 
         # RETURNING TO PARENT DIRECTORY
         os.chdir( self.previous_path )
