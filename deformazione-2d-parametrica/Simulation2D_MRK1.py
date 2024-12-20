@@ -79,6 +79,7 @@ class Simulation2D():
                        SUMULATION_ID,
                        SAVEINPUTDATA       = True, 
                        SAVEDISPLACEMENTCSV = True, 
+                       SAVEINITIALCOORDCSV = False,
                        SAVESTRESSCSV       = True, 
                        SAVEDATABASE        = False, 
                        SAVEJOBINPUT        = False ):
@@ -419,18 +420,30 @@ class Simulation2D():
 
         #----------- SALVA OUTPUT IN FILE CSV -----------#
 
-        if SAVEDISPLACEMENTCSV or SAVESTRESSCSV:
+        if SAVEDISPLACEMENTCSV or SAVESTRESSCSV or SAVEINITIALCOORDCSV:
 
             # Apri output database
             odb = session.openOdb(JOB_NAME + '.odb')
 
-            # Prendi l'ultimo frame
+            # Prendi i frame
+            firstFrame = odb.steps['Step-1'].frames[0]
             lastFrame = odb.steps['Step-1'].frames[-1]
             
             
             # Regioni di cui vogliamo i valori
             outputRegion = odb.rootAssembly.instances['PLATE'].nodeSets['SET-ALL']
             outputRegionExternal = odb.rootAssembly.instances['PLATE'].nodeSets['SURFACE-ALL']
+
+            if SAVEINITIALCOORDCSV:
+                coordinates = firstFrame.fieldOutputs['COORD']
+
+                coordinates = coordinates.getSubset(region=outputRegion)
+                coordinates_data = []
+                for v in coordinates.values:
+                    coordinates_data.append( [v.nodeLabel, v.data[0], v.data[1]] )
+                coordinates_data_np = np.array(coordinates_data)
+                np.savetxt(str(self.index) + '_initial_coordinates.csv', coordinates_data_np, delimiter=',', comments='')
+
 
             if SAVEDISPLACEMENTCSV:
                 

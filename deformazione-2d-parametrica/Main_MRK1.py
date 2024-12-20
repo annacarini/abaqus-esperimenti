@@ -56,35 +56,40 @@ def Main():
     ALPHAS   = [0]
     VELOCITY = -120000 #max value -120000
 
-    
     sim = Simulation2D( DENSITY )
     
     sim.runSimulation( CIRCLE_ORIGIN_X = 0,
                         CIRCLE_ORIGIN_Y = 20,
-                        CIRCLE_VELOCITY = VELOCITY,
+                        CIRCLE_VELOCITY = -1000,
                         ALPHA           = 0,
                         SUMULATION_ID   = 0, 
+                        SAVEINITIALCOORDCSV = True,
                         SAVEDATABASE=True
                    )
-            
+    
     start = time.time() 
     #plotPlatePoints(0, False, 0)
     #plotPlatePoints(0, False, -1) #disabilitato perché abaqus rimane "hanging"
     #plt.show()
 
+
     for idx,VELOCITY in enumerate(range(-1000,-120000,-1000)):    
         # log("Simulation " + str(index) + ", started at " + time.strftime("%H:%M", time.localtime()))
         
+        saveInitialCoords = (idx == 0)  # salviamo la posiz iniziale dei nodi solo nella simulazione zero, tanto rimane sempre uguale
+
         sim.runSimulation( CIRCLE_ORIGIN_X = 0,
                            CIRCLE_ORIGIN_Y = 20,
                            CIRCLE_VELOCITY = VELOCITY,
                            ALPHA           = 0,
-                           SUMULATION_ID   = idx,   
+                           SUMULATION_ID   = idx, 
+                           SAVEINITIALCOORDCSV = saveInitialCoords,     # aggiunto per salvare la posiz iniziale dei nodi
                            SAVEDATABASE=True)
  
     with open("timing.txt", "w") as text_file:
         text_file.write("Total Process time: " + str(time.time() - start))    
-            
+
+
 if __name__ == "__main__":
 
     Main()
