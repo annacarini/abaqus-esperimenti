@@ -538,7 +538,9 @@ class Simulation2D():
                       '.stt',   '.mdl', '.prt', 
                       '.ipm',   '.log', '.com', 
                       '.odb_f', '.abq', '.pac' ]
-                      
+
+        if (not SAVEJOBINPUT):
+            files_ext.append('.inp')
                      
         for file_ex in files_ext:
             
