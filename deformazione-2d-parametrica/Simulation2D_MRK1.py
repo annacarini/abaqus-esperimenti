@@ -10,6 +10,7 @@ from driverUtils import *
 from caeModules  import *
 
 
+
 class Simulation2D():
 
     def __init__( self, 
@@ -78,6 +79,7 @@ class Simulation2D():
                        ALPHA,
                        SUMULATION_ID,
                        SAVEINPUTDATA       = True, 
+                       SAVECIRCLEVELOCITY  = True,
                        SAVEDISPLACEMENTCSV = True, 
                        SAVEINITIALCOORDCSV = False,
                        SAVESTRESSCSV       = True, 
@@ -117,8 +119,9 @@ class Simulation2D():
         
         # SIMULATION ELAPSED TIME
         # self.time_period  = abs( self.circle_plate_distance / CIRCLE_VELOCITY )
-        self.time_period  = abs( self.trajectory / CIRCLE_VELOCITY )
+        # self.time_period  = abs( self.trajectory / CIRCLE_VELOCITY )
         # self.time_period += self.simulation_time_perc*self.time_period
+        self.time_period  = 1.5           # 1 secondo e mezzo, tanto stoppiamo l'analisi prima tramite filter
         
     
         message = f'New folder name : {self.new_path}'
@@ -301,18 +304,45 @@ class Simulation2D():
                                           variables      = ('S', 'E', 'U', 'COORD'), 
                                           frequency      = self.output_frequency )
         
-        
-        #----------- RIGID BODY CONSTRAINT per la circle -----------#
+
+        #----------- RIGID BODY CONSTRAINT per la palla -----------#
 
         # crea reference point nella coordinata dove si trova il centro della palla
         RP_circle_id     = model.rootAssembly.ReferencePoint( point = ( self.circle_origin_x + self.translation, self.circle_origin_y, 0) ).id
         
         RP_circle_region = regionToolset.Region( referencePoints = ( model.rootAssembly.referencePoints[RP_circle_id], ) )
+        #RP_circle_set = model.rootAssembly.Set(region = RP_circle_region)
+        RP_circle_set = model.rootAssembly.Set(name ="circle-rp", referencePoints = ( model.rootAssembly.referencePoints[RP_circle_id], ))
 
         # assegna rigid body constraint alla circle associato al reference point
         model.RigidBody( name           = 'constraint-circle-rigid-body', 
                          refPointRegion = RP_circle_region, 
                          bodyRegion     = model.rootAssembly.instances['circle'].sets['set-all'] )
+
+
+
+
+        #----------- FILTER per fermare l'analisi quando la palla si ferma o rimbalza verso l'alto -----------#
+
+        # crea filtro
+        filter = model.ButterworthFilter( name = "Filter-1",
+                                        # cutoffFrequency = frequency above which the filter attenuates at least half of the input signal
+                                        # => l'ho scelta a caso alta, da rivedere
+                                         cutoffFrequency = 10000,
+                                         operation = abaqusConstants.MAX,
+                                         limit = 0,         # se la palla ha velocita' verticale zero o si e' fermata o sta per rimbalzare
+                                         halt = True )      # per far fermare l'analisi quando il valore limit e' raggiunto
+
+
+        # aggiungi una history output request per la velocita' verticale della palla, in modo da potergli applicare un filtro
+        model.HistoryOutputRequest( name = 'H-Output-Circle-V2', 
+                                    createStepName = 'Step-1', 
+                                    region = RP_circle_set,
+                                    variables = ('V2',),        # velocita' verticale
+                                    frequency = 200,
+                                    filter = "Filter-1" )
+
+
 
 
 
@@ -403,13 +433,12 @@ class Simulation2D():
         #----------- JOB -----------#
 
         JOB_NAME = "Simulation_Job_" + str(self.index)
-        job      = mdb.Job( name  = JOB_NAME, 
-                            model = MODEL_NAME )
+        job = mdb.Job( name  = JOB_NAME, 
+                       model = MODEL_NAME )
         
         
         # salva input file ("<nome job>.inp")
         if SAVEJOBINPUT:
-            
             job.writeInput()
         
     
@@ -418,9 +447,10 @@ class Simulation2D():
         job.waitForCompletion()
         
 
+
         #----------- SALVA OUTPUT IN FILE CSV -----------#
 
-        if SAVEDISPLACEMENTCSV or SAVESTRESSCSV or SAVEINITIALCOORDCSV:
+        if SAVECIRCLEVELOCITY or SAVEDISPLACEMENTCSV or SAVESTRESSCSV or SAVEINITIALCOORDCSV:
 
             # Apri output database
             odb = session.openOdb(JOB_NAME + '.odb')
@@ -429,10 +459,21 @@ class Simulation2D():
             firstFrame = odb.steps['Step-1'].frames[0]
             lastFrame = odb.steps['Step-1'].frames[-1]
             
-            
             # Regioni di cui vogliamo i valori
             outputRegion = odb.rootAssembly.instances['PLATE'].nodeSets['SET-ALL']
             outputRegionExternal = odb.rootAssembly.instances['PLATE'].nodeSets['SURFACE-ALL']
+
+
+            # Salva la velocita' verticale della palla, per vedere se e' arrivata a zero o no
+            if SAVECIRCLEVELOCITY:
+                region = odb.steps['Step-1'].historyRegions['Node ASSEMBLY.1']
+                v2Data = region.historyOutputs['V2_FILTER-1'].data
+                velocity_data = []
+                for time, v2 in v2Data:
+                    velocity_data.append( [time, v2] )
+                velocity_data_np = np.array(velocity_data)
+                np.savetxt(str(self.index) + '_circle_velocity_y.csv', velocity_data_np, delimiter=',', comments='')
+
 
             if SAVEINITIALCOORDCSV:
                 coordinates = firstFrame.fieldOutputs['COORD']
@@ -491,12 +532,12 @@ class Simulation2D():
 
         #----------- ELIMINA FILE EXTRA GENERATI DA ABAQUS -----------#
 
-        files_ext = [ '.jnl',   '.inp', '.res', 
+        files_ext = [ '.jnl',   '.res', '.sel',
                       '.lck',   '.dat', '.msg', 
                       '.sta',   '.fil', '.sim',
                       '.stt',   '.mdl', '.prt', 
                       '.ipm',   '.log', '.com', 
-                      '.odb_f', '.abq', '.pac', '.sel' ]
+                      '.odb_f', '.abq', '.pac' ]
                       
                      
         for file_ex in files_ext:
@@ -510,3 +551,4 @@ class Simulation2D():
 
         # RETURNING TO PARENT DIRECTORY
         os.chdir( self.previous_path )
+

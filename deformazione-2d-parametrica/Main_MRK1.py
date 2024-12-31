@@ -13,9 +13,7 @@ from Simulation2D_MRK1 import *
 
 
 def log(message):
-    
     print(message, file = sys.__stdout__)
-    
     return
 
 
@@ -46,33 +44,32 @@ def plotPlatePoints(simulationID, onlyExternal = False, frameIndex=-1):
     plt.title("Simulation " + str(simulationID) + ", Frame " + str(frameIndex))
 
 
-import time
 
 def Main():
     
-
-
     DENSITY  = 2.7E-4
     ALPHAS   = [0]
-    VELOCITY = -120000 #max value -120000
+    VELOCITY = -120000 #max value -120000 => no in realta' facendo continuare la simulazione finche' la palla non si ferma da' errore anche con -3000
 
     sim = Simulation2D( DENSITY )
     
-    sim.runSimulation( CIRCLE_ORIGIN_X = 0,
-                        CIRCLE_ORIGIN_Y = 20,
-                        CIRCLE_VELOCITY = -1000,
-                        ALPHA           = 0,
-                        SUMULATION_ID   = 0, 
+    sim.runSimulation(  CIRCLE_ORIGIN_X = 0,
+                        CIRCLE_ORIGIN_Y = 4.5001,
+                        CIRCLE_VELOCITY = -600,
+                        ALPHA           = 60,
+                        SUMULATION_ID   = 1, 
                         SAVEINITIALCOORDCSV = True,
-                        SAVEDATABASE=True
+                        SAVEDATABASE = True,
+                        SAVEJOBINPUT = False
                    )
     
     start = time.time() 
-    #plotPlatePoints(0, False, 0)
-    #plotPlatePoints(0, False, -1) #disabilitato perché abaqus rimane "hanging"
-    #plt.show()
 
+    #plotPlatePoints(1, False, 0)
+    plotPlatePoints(1, False, -1)
+    plt.show()
 
+    '''
     for idx,VELOCITY in enumerate(range(-1000,-120000,-1000)):    
         # log("Simulation " + str(index) + ", started at " + time.strftime("%H:%M", time.localtime()))
         
@@ -88,10 +85,9 @@ def Main():
  
     with open("timing.txt", "w") as text_file:
         text_file.write("Total Process time: " + str(time.time() - start))    
-
+    '''
 
 if __name__ == "__main__":
-
     Main()
 
 
