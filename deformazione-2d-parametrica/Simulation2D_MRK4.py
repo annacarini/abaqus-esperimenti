@@ -480,6 +480,17 @@ class Simulation2D():
         job.waitForCompletion()
         
 
+
+        # Check if simulation has completed, i.e. if the circle has stopped
+        circle_region = session.openOdb(JOB_NAME + '.odb').steps['Step-1'].historyRegions['Node ASSEMBLY.1']
+        circle_v2Data = circle_region.historyOutputs['V2_FILTER-1'].data
+        (simulation_length, circle_final_velocity) = circle_v2Data[-1]
+
+        # Variable that says whether simulation has completed
+        simulation_completed = (circle_final_velocity >= 0.0)
+
+
+
         #----------- SAVING OUTPUT IN FILE CSV -----------#
 
         if SAVECIRCLEVELOCITY or SAVEDISPLACEMENT or SAVESTRESS or SAVEINITIALCOORD:
@@ -521,15 +532,15 @@ class Simulation2D():
                 velocity_df = pd.DataFrame( { 'Time'     : [ time for time, _ in v2Data ] ,
                                               'Velocity' : [ v2   for _, v2   in v2Data ] } )
                 
-                velocity_output_filename = os.path.join( self.new_path, 'circle_velocity_y.csv' )
+                velocity_output_filename = os.path.join( self.new_path, str(self.index) + '_circle_velocity_y.csv' )
             
             
                 velocity_df.to_csv( velocity_output_filename, index = False )
             
             
-            #******************************
-            # SAVING VELOCITY OF THE CIRCLE
-            #******************************
+            #**********************************************
+            # SAVING INITIAL COORDINATES OF THE PLATE NODES
+            #**********************************************
             if SAVEINITIALCOORD:
                 
                 coordinates = firstFrame.fieldOutputs['COORD'].getSubset( region = outputRegion )
@@ -538,7 +549,7 @@ class Simulation2D():
                                                          'X_Coord' : [ values.data[0]   for values in coordinates.values ],
                                                          'Y_Coord' : [ values.data[1]   for values in coordinates.values ] } )
                 
-                coordinate_output_filename = os.path.join( self.new_path, 'initial_coordinates.csv' )
+                coordinate_output_filename = os.path.join( self.new_path, str(self.index) + '_initial_coordinates.csv' )
                 
                 initial_coordinates_df.to_csv( coordinate_output_filename, index = False )
             
@@ -557,7 +568,7 @@ class Simulation2D():
                                                   'X_Disp' : [ values.data[0]   for values in displacement.values ],
                                                   'Y_Disp' : [ values.data[1]   for values in displacement.values ] } )
                 
-                displacement_output_filename = os.path.join( self.new_path, 'output_displacement.csv' )
+                displacement_output_filename = os.path.join( self.new_path, str(self.index) + '_output_displacement.csv' )
 
                 displacement_df.to_csv( displacement_output_filename, index = False )
 
@@ -569,7 +580,7 @@ class Simulation2D():
                                                             'X_Disp' : [ values.data[0]   for values in displacement_external.values ],
                                                             'Y_Disp' : [ values.data[1]   for values in displacement_external.values ] } )
                 
-                displacement_external_output_filename = os.path.join( self.new_path, 'output_displacement_external.csv' )
+                displacement_external_output_filename = os.path.join( self.new_path, str(self.index) + '_output_displacement_external.csv' )
 
                 displacement_external_df.to_csv( displacement_external_output_filename, index = False )
                 
@@ -588,7 +599,7 @@ class Simulation2D():
                                             'Data' : [ values.data      for values in stress.values ] } )
                 
                 
-                stress_output_filename = os.path.join( self.new_path, 'output_stress.csv' )
+                stress_output_filename = os.path.join( self.new_path, str(self.index) + '_output_stress.csv' )
                 
                 stress_df.to_csv( stress_output_filename, index = False )
 
@@ -631,6 +642,8 @@ class Simulation2D():
         # RETURNING TO PARENT DIRECTORY
         #******************************
         os.chdir( self.previous_path )
+
+        return (simulation_length, simulation_completed)
         
         
     def get_simulation_folder( self ):
