@@ -31,7 +31,7 @@ def Main():
     INFO_FILE_PATH = "Simulations_Info.csv"
     with open(INFO_FILE_PATH, 'w', newline='') as info_csv:
         info_csv_writer = csv.writer(info_csv)
-        info_csv_writer.writerow(["INDEX", "SiMULATION_TIME", "SIMULATION_LENGTH", "COMPLETED", "INIT_SPEED", "ANGLE"])
+        info_csv_writer.writerow(["INDEX", "SIMULATION_TIME", "SIMULATION_LENGTH", "COMPLETED", "INIT_SPEED", "ANGLE"])
 
 
     # NOTA:
