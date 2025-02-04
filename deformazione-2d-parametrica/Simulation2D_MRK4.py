@@ -112,7 +112,7 @@ class Simulation2D():
         with open( filename, "w") as outfile: 
             
             json.dump(inputData, outfile)
-            
+  
             
     def runSimulation( self,
                        CIRCLE_ORIGIN_X,
@@ -123,6 +123,7 @@ class Simulation2D():
                        SAVEINPUTDATA      = True, 
                        SAVECIRCLEVELOCITY = True,
                        SAVEDISPLACEMENT   = True, 
+                       SAVEEDGES          = True,
                        SAVEINITIALCOORD   = False,
                        SAVESTRESS         = True, 
                        SAVEDATABASE       = False, 
@@ -436,8 +437,8 @@ class Simulation2D():
 
         # seed sui lati dx e sx a single bias (cioe' un gradiente con due valori)
         part_plate.seedEdgeByBias( biasMethod = abaqusConstants.SINGLE, 
-                                   end1Edges  = part_plate.sets['surface-right'].edges, 
-                                   end2Edges  = part_plate.sets['surface-left'].edges,
+                                   end2Edges  = part_plate.sets['surface-right'].edges, 
+                                   end1Edges  = part_plate.sets['surface-left'].edges,
                                    minSize    = self.plate_seed_sx_dx_min, 
                                    maxSize    = self.plate_seed_sx_dx_max )
 
@@ -471,8 +472,89 @@ class Simulation2D():
             
             job.writeInput()
         
-        
+
+
+        if SAVEEDGES:
+
+            # Nota: nella "connectivity" degli elementi i label dei nodi partono da 0, mentre i label dei nodi dentro "nodes" partono da 1
+            # (Confermato qua: https://imechanica.org/node/17245) 
+            # Quindi da connectivity devo aumentare tutti i label di 1 prima di scartare quelli non presenti dentro "plate_surface_nodes_labels"
+
+            # Nota 2: La connectivity restituisce i vertici dell'elemento, in ordine antiorario. Quindi se e' un elemento con
+            # 4 vertici, la connectivity e' tipo [1,2,3,4], dove gli edge sono (1,2), (2,3), (3,4), (4,1).
+            # Quindi a partire dalla connectivity posso generarmi tutti e quattro gli edge, skippando quelli in cui
+            # uno dei due nodi non e' sulla superficie, poi ordinare ogni tupla in ordine crescente e inserirle a edges
+            # solo se non e' gia' presente
+
+            # Nota 3: i nodi di plate e circle hanno dei label in comune, quindi bisogna generare due file diversi
+
+            # PLATE
+            surface_elements_plate = part_plate.sets['surface-all'].elements
+            surface_nodes_labels_plate = [node.label for node in part_plate.sets['surface-all'].nodes]
+
+            # tipo: ["1,2", "2,3", ...]
+            surface_edges_plate = []
+            for elem in surface_elements_plate:
+
+                connectivity = elem.connectivity
+                for i in range(0,len(connectivity)):
+
+                    first_node = connectivity[i] + 1
+                    second_node = connectivity[(i+1)%len(connectivity)] + 1 # nodo dopo, o primo nodo se first_node e' l'ultimo
+                
+                    # se sia first_node che second_node sono sulla superficie, aggiungi la tupla a edges
+                    if (first_node in surface_nodes_labels_plate and second_node in surface_nodes_labels_plate):
+                        
+                        # mettili in ordine crescente
+                        if (first_node < second_node):
+                            edge = str(first_node) + "," + str(second_node)
+                        else:
+                            edge = str(second_node) + "," + str(first_node)
+
+                        if (not edge in surface_edges_plate):
+                            surface_edges_plate.append(edge)
+
+            with open('plate_surface_edges.txt', mode='wt', encoding='utf-8') as plateEdgesFile:
+                for line in surface_edges_plate:
+                    print(line, file = plateEdgesFile)
+            plateEdgesFile.close
             
+
+            # CIRCLE
+            surface_elements_circle = part_circle.sets['surface'].elements
+            surface_nodes_labels_circle = [node.label for node in part_circle.sets['surface'].nodes]
+
+            # tipo: ["1,2", "2,3", ...]
+            surface_edges_circle = []
+            for elem in surface_elements_circle:
+
+                connectivity = elem.connectivity
+                for i in range(0,len(connectivity)):
+
+                    first_node = connectivity[i] + 1
+                    second_node = connectivity[(i+1)%len(connectivity)] + 1 # nodo dopo, o primo nodo se first_node e' l'ultimo
+                
+                    # se sia first_node che second_node sono sulla superficie, aggiungi la tupla a edges
+                    if (first_node in surface_nodes_labels_circle and second_node in surface_nodes_labels_circle):
+                        
+                        # mettili in ordine crescente
+                        if (first_node < second_node):
+                            edge = str(first_node) + "," + str(second_node)
+                        else:
+                            edge = str(second_node) + "," + str(first_node)
+
+                        if (not edge in surface_edges_circle):
+                            surface_edges_circle.append(edge)
+
+            with open('circle_surface_edges.txt', mode='wt', encoding='utf-8') as circleEdgesFile:
+                for line in surface_edges_circle:
+                    print(line, file = circleEdgesFile)
+            circleEdgesFile.close
+            
+        
+
+
+
         #*******************
         # SUBMITTING THE JOB:
         #*******************
@@ -519,6 +601,8 @@ class Simulation2D():
             #********************
             outputRegion         = odb.rootAssembly.instances['PLATE'].nodeSets['SET-ALL']
             outputRegionExternal = odb.rootAssembly.instances['PLATE'].nodeSets['SURFACE-ALL']
+            outputRegionCircle = odb.rootAssembly.instances['CIRCLE'].nodeSets['SET-ALL']
+            outputRegionCircleExternal = odb.rootAssembly.instances['CIRCLE'].nodeSets['SURFACE']
             
             
             #******************************
@@ -539,21 +623,33 @@ class Simulation2D():
             
             
             #**********************************************
-            # SAVING INITIAL COORDINATES OF THE PLATE NODES
+            # SAVING INITIAL COORDINATES OF THE PLATE NODES and CIRCLE NODES
             #**********************************************
             if SAVEINITIALCOORD:
                 
-                coordinates = firstFrame.fieldOutputs['COORD'].getSubset( region = outputRegion )
+                # PLATE
+                coordinates_plate = firstFrame.fieldOutputs['COORD'].getSubset( region = outputRegionExternal )
                 
-                initial_coordinates_df = pd.DataFrame( { 'Id'      : [ values.nodeLabel for values in coordinates.values ],
-                                                         'X_Coord' : [ values.data[0]   for values in coordinates.values ],
-                                                         'Y_Coord' : [ values.data[1]   for values in coordinates.values ] } )
+                initial_coordinates_plate_df = pd.DataFrame( { 'Id'      : [ values.nodeLabel for values in coordinates_plate.values ],
+                                                         'X_Coord' : [ values.data[0]   for values in coordinates_plate.values ],
+                                                         'Y_Coord' : [ values.data[1]   for values in coordinates_plate.values ] } )
                 
-                coordinate_output_filename = os.path.join( self.new_path, str(self.index) + '_initial_coordinates.csv' )
-                
-                initial_coordinates_df.to_csv( coordinate_output_filename, index = False )
+                coordinate_output_plate_filename = os.path.join( self.new_path, str(self.index) + '_initial_coordinates_plate.csv' )
+        
+                initial_coordinates_plate_df.to_csv( coordinate_output_plate_filename, index = False )
             
+                # CIRCLE
+                coordinates_circle = firstFrame.fieldOutputs['COORD'].getSubset( region = outputRegionCircleExternal )
+                
+                initial_coordinates_circle_df = pd.DataFrame( { 'Id'      : [ values.nodeLabel for values in coordinates_circle.values ],
+                                                         'X_Coord' : [ values.data[0]   for values in coordinates_circle.values ],
+                                                         'Y_Coord' : [ values.data[1]   for values in coordinates_circle.values ] } )
+                
+                coordinate_output_circle_filename = os.path.join( self.new_path, str(self.index) + '_initial_coordinates_circle.csv' )
+                
+                initial_coordinates_circle_df.to_csv( coordinate_output_circle_filename, index = False )
             
+
             #******************************************
             # SAVING DISPLACEMENTS OF A SPECIFIC REGION
             #******************************************

@@ -3,6 +3,7 @@ import os
 if os.getcwd() not in sys.path: sys.path.append( os.getcwd() )
 import time
 import csv
+import SceneDrawer
 
 
 from abaqus            import *
@@ -22,7 +23,7 @@ def Main():
     
     DENSITY  = 2.7E-4
     ALPHAS   = [0]             # DEGREE
-    VELOCITIES = [1000, 1600]   # temporaneo, poi lo cambiamo in velocity_min e velocity_max
+    VELOCITIES = [1000]   # temporaneo, poi lo cambiamo in velocity_min e velocity_max
 
     sim = Simulation2D( DENSITY )
 
@@ -35,10 +36,11 @@ def Main():
 
 
     # NOTA:
-    # SiMULATION_TIME = tempo impiegato ad eseguire la simulazione
+    # SIMULATION_TIME = tempo impiegato ad eseguire la simulazione
     # SIMULATION_LENGTH = durata della simulazione, cioè tempo che impiega la palla a fermarsi
 
     idx = 0
+
 
     for alpha in ALPHAS:
         for velocity in VELOCITIES:
@@ -53,7 +55,8 @@ def Main():
                 CIRCLE_VELOCITY = velocity,
                 ALPHA           = alpha,
                 SUMULATION_ID   = idx,
-                SAVEDATABASE    = True
+                SAVEDATABASE    = True,
+                SAVEINITIALCOORD = True
             )
 
             simulation_time = str(time.time() - start)
@@ -63,13 +66,23 @@ def Main():
                 info_csv_append = csv.writer(info_csv)
                 info_csv_append.writerow([idx, simulation_time, simulation_length, simulation_completed, velocity, alpha])
             
-                    
-            # plotPlatePoints( simulation_folder = sim.get_simulation_folder(), 
-                            # onlyExternal      = False, 
-                            # frameIndex        = -1 )
+
+            # Crea e salva immagine situazione iniziale (temporaneo per testare funzione di disegno)
+            previous_path = os.getcwd()
+            os.chdir(sim.get_simulation_folder())
+            SceneDrawer.drawImage(
+                imageName = str(idx) + "_init.png",
+                plateNodesFilename = str(idx) + "_initial_coordinates_plate.csv",
+                plateEdgesFilename = "plate_surface_edges.txt",
+                circleNodesFilename = str(idx) + "_initial_coordinates_circle.csv", 
+                circleEdgesFilename = "circle_surface_edges.txt"
+            )
+            os.chdir(previous_path)
+
 
             idx = idx + 1
             
+
 
 if __name__ == "__main__":
 
