@@ -1,4 +1,5 @@
 import os
+import sys
 import abaqusConstants
 import mesh
 import numpy           as np
@@ -12,8 +13,14 @@ from abaqus      import *
 from driverUtils import *
 from caeModules  import *
 from matplotlib  import pyplot as plt
-    
-    
+
+
+
+def log(message):
+    print(message, file = sys.__stdout__)
+    return
+
+
 def plotPlatePoints( simulation_folder, 
                      onlyExternal = False, 
                      frameIndex   = -1 ):
@@ -115,8 +122,6 @@ class Simulation2D():
   
             
     def runSimulation( self,
-                       CIRCLE_ORIGIN_X,
-                       CIRCLE_ORIGIN_Y,
                        CIRCLE_VELOCITY,
                        ALPHA,
                        SUMULATION_ID,
@@ -124,8 +129,8 @@ class Simulation2D():
                        SAVECIRCLEVELOCITY = True,
                        SAVEDISPLACEMENT   = True, 
                        SAVEEDGES          = True,
-                       SAVEINITIALCOORD   = False,
-                       SAVESTRESS         = True, 
+                       SAVECOORDINATES    = True,
+                       SAVESTRESS         = False, 
                        SAVEDATABASE       = False, 
                        SAVEJOBINPUT       = False ):
                            
@@ -140,16 +145,29 @@ class Simulation2D():
         self.index                 = SUMULATION_ID
         self.circle_speed_x        = +CIRCLE_VELOCITY*math.sin( math.radians( ALPHA ) )
         self.circle_speed_y        = -CIRCLE_VELOCITY*math.cos( math.radians( ALPHA ) )
-        self.circle_origin_x       = CIRCLE_ORIGIN_X
-        self.circle_origin_y       = CIRCLE_ORIGIN_Y
         self.circle_impact_angle   = ALPHA
-        self.circle_plate_distance = ( self.circle_origin_y - self.circle_radius )
-        self.simulation_time_perc  = 0.1                                                                                    #PERCENTAGE
-        self.translation           = self.circle_origin_y/math.cos( math.radians( ALPHA ) ) if ALPHA != 0 else 0
-        self.translation           = self.translation*math.sin(  math.radians( ALPHA ) )    if ALPHA != 0 else 0
-        self.trajectory            = math.sqrt( (self.circle_origin_y - self.circle_radius)*( self.circle_origin_y - self.circle_radius ) + 
-                                                self.translation*self.translation )
-        
+
+        self.simulation_time_perc  = 0.1            #PERCENTAGE
+
+
+        # vogliamo che il tempo che ci mette la palla a raggiungere la lastra sia sempre 2/30 secondi
+        # sappiamo la velocita', l'angolo, il punto di impatto e il tempo totale, dobbiamo calcolare la posizione
+        # iniziale (x e y) della palla
+
+        # Time for the circle to reach the plate, fixed
+        self.TIME_TO_IMPACT = 2/30
+
+        # Length of the trajectory that we need for the circle to take the desired time to reach the plate
+        self.trajectory = abs(self.TIME_TO_IMPACT * CIRCLE_VELOCITY)
+
+        # The initial X and Y of the circle are computed using the desired trajectory length and the angle
+        self.circle_origin_x = - self.trajectory*math.sin(math.radians(ALPHA))
+        self.circle_origin_y = self.trajectory*math.cos(math.radians(ALPHA))
+
+        #log("circle x: " + str(self.circle_origin_x))
+        #log("circle y: " + str(self.circle_origin_y))
+
+
         # Crea cartella (se non esiste) con nome <index>
         self.folder_name   = f'Dynamic_Simulation_{self.index}'
         self.previous_path = os.getcwd()
@@ -162,26 +180,24 @@ class Simulation2D():
         
         
         # SIMULATION ELAPSED TIME
-        self.time_period  = abs( self.trajectory / CIRCLE_VELOCITY )
+        self.time_period = self.TIME_TO_IMPACT
         #self.time_period += self.simulation_time_perc*self.time_period
         self.time_period += abs(self.circle_speed_y/15000)
         
     
-        message = f'New folder name : {self.new_path}'
-        print( len(message)*'*' )
-        print( message )
-        # print( f"Y coordinate of the circle's center...: {self.circle_origin_y:8.4f}" )
-        # print( f'Translation...........................: {self.translation:8.4f}' )
-        print( len(message)*'*' )
+        #message = f'New folder name : {self.new_path}'
+        #log( len(message)*'*' )
+        #log( message )
+        # log( f"Y coordinate of the circle's center...: {self.circle_origin_y:8.4f}" )
+        #log( len(message)*'*' )
         
         
         #************************
         # CHECKING FOR INPUT DATA
         #************************
         if ( self.circle_origin_y - self.circle_radius ) <= ( self.plate_height/2 ):
-            
-            print( 'Circle is too close to the plate.' )
-            return
+            log( 'Circle is too close to the plate.' )
+            return (0, False)
             
             
         #***********************
@@ -191,7 +207,6 @@ class Simulation2D():
         
         
         if SAVEINPUTDATA:
-            
             self._saveInputDataToFile()
 
 
@@ -235,11 +250,11 @@ class Simulation2D():
 
         # crea diversi set per le superfici della plate, per assegnargli una boundary condition (sotto) e per impostare l'interaction (sopra) 
         # e per gestire il seed della mesh
-        part_plate.Set( name = 'surface-top',    edges = part_plate.edges.findAt( coordinates = ( (0,                   0, 0), ) ) )
-        part_plate.Set( name = 'surface-bottom', edges = part_plate.edges.findAt( coordinates = ( (0,                  -self.plate_height, 0), ) ) )
-        part_plate.Set( name = 'surface-left',   edges = part_plate.edges.findAt( coordinates = ( (-self.plate_width/2, 0,                   0), ) ) )
-        part_plate.Set( name = 'surface-right',  edges = part_plate.edges.findAt( coordinates = ( (self.plate_width/2,  0,                   0), ) ) )
-        part_plate.Surface( name = 'surface-top', end1Edges = part_plate.edges.findAt(coordinates = ( (0,                   0, 0), )  ) )
+        part_plate.Set( name = 'surface-top',    edges = part_plate.edges.findAt( coordinates = ( (0, 0, 0), ) ) )
+        part_plate.Set( name = 'surface-bottom', edges = part_plate.edges.findAt( coordinates = ( (0, -self.plate_height, 0), ) ) )
+        part_plate.Set( name = 'surface-left',   edges = part_plate.edges.findAt( coordinates = ( (-self.plate_width/2, 0, 0), ) ) )
+        part_plate.Set( name = 'surface-right',  edges = part_plate.edges.findAt( coordinates = ( (self.plate_width/2, 0, 0), ) ) )
+        part_plate.Surface( name = 'surface-top', end1Edges = part_plate.edges.findAt(coordinates = ( (0, 0, 0), )  ) )
 
         # set tutti i nodi esterni, per l'output
         part_plate.SetByBoolean( name = 'surface-all', 
@@ -324,7 +339,7 @@ class Simulation2D():
                                      
         model.rootAssembly.Instance( name      = 'circle', 
                                      part      = part_circle, 
-                                     dependent = abaqusConstants.ON).translate( ( ( - self.translation ), self.circle_origin_y, 0 ) )
+                                     dependent = abaqusConstants.ON).translate(( self.circle_origin_x, self.circle_origin_y, 0 ))
                                      
                                      
         #----------- STEP -----------#
@@ -345,7 +360,7 @@ class Simulation2D():
         #----------- RIGID BODY CONSTRAINT per la circle -----------#
 
         # crea reference point nella coordinata dove si trova il centro della palla
-        RP_circle_id     = model.rootAssembly.ReferencePoint( point = ( self.circle_origin_x - self.translation, self.circle_origin_y, 0) ).id
+        RP_circle_id     = model.rootAssembly.ReferencePoint( point = ( self.circle_origin_x, self.circle_origin_y, 0) ).id
         
         RP_circle_region = regionToolset.Region( referencePoints = ( model.rootAssembly.referencePoints[RP_circle_id], ) )
         RP_circle_set    = model.rootAssembly.Set( name = "circle-rp", referencePoints = ( model.rootAssembly.referencePoints[RP_circle_id], ))
@@ -469,7 +484,6 @@ class Simulation2D():
         # SAVING INPUT FILE AS ("<NOME JOB>.INP")
         #****************************************
         if SAVEJOBINPUT:
-            
             job.writeInput()
         
 
@@ -575,7 +589,7 @@ class Simulation2D():
 
         #----------- SAVING OUTPUT IN FILE CSV -----------#
 
-        if SAVECIRCLEVELOCITY or SAVEDISPLACEMENT or SAVESTRESS or SAVEINITIALCOORD:
+        if SAVECIRCLEVELOCITY or SAVEDISPLACEMENT or SAVESTRESS or SAVECOORDINATES:
     
     
             #*****************
@@ -594,8 +608,24 @@ class Simulation2D():
             # GETTING LAST FRAME AVAILABLE
             #*****************************
             lastFrame = odb.steps['Step-1'].frames[-1]
-            
-            
+
+
+
+            # Frame 1/30 secondi prima dell'impatto
+            frameOne30BeforeImpact = None
+
+            for frame in odb.steps['Step-1'].frames:
+                # visto che la simulazione e' fatta nel dominio del tempo (il campo domain di Step e' AbaqusConstants.TIME),
+                # allora frameValue e' il tempo del frame
+                if (frame.frameValue >= 1/30):
+                    #log("found frame one")
+                    frameOne30BeforeImpact = frame
+                    break
+ 
+            if (frameOne30BeforeImpact == None):
+                log("frame one not found")
+
+
             #********************
             # REGIONS OF INTEREST
             #********************
@@ -623,9 +653,11 @@ class Simulation2D():
             
             
             #**********************************************
-            # SAVING INITIAL COORDINATES OF THE PLATE NODES and CIRCLE NODES
+            # SAVING COORDINATES of the PLATE NODES and CIRCLE NODES
             #**********************************************
-            if SAVEINITIALCOORD:
+            if SAVECOORDINATES:
+
+                # ****** Initial coordinates = 2/30 seconds before impact ******
                 
                 # PLATE
                 coordinates_plate = firstFrame.fieldOutputs['COORD'].getSubset( region = outputRegionExternal )
@@ -649,6 +681,29 @@ class Simulation2D():
                 
                 initial_coordinates_circle_df.to_csv( coordinate_output_circle_filename, index = False )
             
+
+
+                # ****** Coordinates 1/30 seconds before impact ******
+
+                if (frameOne30BeforeImpact != None):
+                    
+                    # PLATE
+                    one_30_coordinates_plate = frameOne30BeforeImpact.fieldOutputs['COORD'].getSubset( region = outputRegionExternal )
+                    one_30_coordinates_plate_df = pd.DataFrame( { 'Id'      : [ values.nodeLabel for values in one_30_coordinates_plate.values ],
+                                                            'X_Coord' : [ values.data[0]   for values in one_30_coordinates_plate.values ],
+                                                            'Y_Coord' : [ values.data[1]   for values in one_30_coordinates_plate.values ] } )
+                    one_30_coordinate_output_plate_filename = os.path.join(self.new_path, str(self.index) + '_before_impact_coordinates_plate.csv')
+                    one_30_coordinates_plate_df.to_csv(one_30_coordinate_output_plate_filename, index = False)
+                
+                    # CIRCLE
+                    one_30_coordinates_circle = frameOne30BeforeImpact.fieldOutputs['COORD'].getSubset( region = outputRegionCircleExternal )                
+                    one_30_coordinates_circle_df = pd.DataFrame( { 'Id'      : [ values.nodeLabel for values in one_30_coordinates_circle.values ],
+                                                            'X_Coord' : [ values.data[0]   for values in one_30_coordinates_circle.values ],
+                                                            'Y_Coord' : [ values.data[1]   for values in one_30_coordinates_circle.values ] } )
+                    one_30_coordinate_output_circle_filename = os.path.join(self.new_path, str(self.index) + '_before_impact_coordinates_circle.csv')
+                    one_30_coordinates_circle_df.to_csv(one_30_coordinate_output_circle_filename, index = False)
+            
+
 
             #******************************************
             # SAVING DISPLACEMENTS OF A SPECIFIC REGION

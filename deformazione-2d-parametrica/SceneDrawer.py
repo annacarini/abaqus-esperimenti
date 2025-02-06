@@ -2,8 +2,19 @@ import matplotlib.pyplot as plt
 import csv
 
 
+# Bisognera' controllare se questi range sono abbastanza/troppo grandi
+MIN_X = -60
+MAX_X = 60
+MIN_Y = -10     # il lato sotto della lastra e' a -5
+MAX_Y = 100
+
+
 def drawImage(imageName, plateNodesFilename, plateEdgesFilename, circleNodesFilename, circleEdgesFilename):
 
+    plt.clf()       # cancella plot, necessario se no chiamando la funzione piu volte di fila mi mantiene i plot precedenti
+    plt.axis('scaled')
+    plt.xlim([MIN_X, MAX_X]) 
+    plt.ylim([MIN_Y, MAX_Y])
 
     # crea dizionario delle coordinate dei nodi del plate
     with open(plateNodesFilename, mode='r') as infile:
@@ -18,8 +29,6 @@ def drawImage(imageName, plateNodesFilename, plateEdgesFilename, circleNodesFile
         next(reader)    # skip header
         circleNodes = {row[0]:[row[1], row[2]] for row in reader}
 
-    fig = plt.figure()
-    fig.tight_layout()
 
     # disegna plate
     with open(plateEdgesFilename, mode='r') as infile:
@@ -31,6 +40,7 @@ def drawImage(imageName, plateNodesFilename, plateEdgesFilename, circleNodesFile
             y_values = [float(firstNode[1]), float(secondNode[1])]
             plt.plot(x_values, y_values, 'red')
 
+
     # disegna circle
     with open(circleEdgesFilename, mode='r') as infile:
         reader = csv.reader(infile)
@@ -41,7 +51,19 @@ def drawImage(imageName, plateNodesFilename, plateEdgesFilename, circleNodesFile
             y_values = [float(firstNode[1]), float(secondNode[1])]
             plt.plot(x_values, y_values, 'red')
 
-    plt.axis('scaled')
+
     plt.axis('off')
-    #plt.show()
-    fig.savefig(imageName)
+    #plt.show()     # nota: se faccio "show" prima di savefig, salva un'immagine vuota
+    plt.savefig(imageName)
+
+
+'''
+folderName = "Dynamic_Simulation_0/"
+drawImage(
+                imageName = "before_impact.png",
+                plateNodesFilename = folderName + "0_before_impact_coordinates_plate.csv",
+                plateEdgesFilename = folderName + "plate_surface_edges.txt",
+                circleNodesFilename = folderName + "0_before_impact_coordinates_circle.csv", 
+                circleEdgesFilename = folderName + "circle_surface_edges.txt"
+            )
+'''
