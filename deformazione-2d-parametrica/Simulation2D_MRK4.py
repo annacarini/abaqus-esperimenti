@@ -64,20 +64,19 @@ def plotPlatePoints( simulation_folder,
 class Simulation2D():
 
     def __init__( self, 
-                  circle_density ):
+                  circle_radius ):
 
         # PARAMETERS
         self.index          = None
         self.circle_speed_x = None
         self.circle_speed_y = None
-        self.circle_density = circle_density
+        self.circle_radius = circle_radius
         self.circle_impact_angle = None
  
  
          # OBJECT DIMENSION
         self.plate_width         = 50
         self.plate_height        = 4
-        self.circle_radius       = 2.5
 
 
         # INITIAL POSITIONS
@@ -87,7 +86,8 @@ class Simulation2D():
         self.circle_origin_y = 0
 
 
-        # MATERIAL
+        # MATERIALS
+        self.circle_density = 2.7E-4
         self.steel_density = ((7.83e-7, ),)
         self.steel_elastic = ((200e3, 0.3),)                # (YOUNG'S MODULUS, POISSON RATIO)
         self.steel_plastic = ((350, 0), (500, 0.8),)
@@ -112,7 +112,8 @@ class Simulation2D():
                       "density"             : self.circle_density,
                       "circle_speed_x"      : self.circle_speed_x,
                       "circle_speed_y"      : self.circle_speed_y,
-                      "circle_impact_angle" : self.circle_impact_angle }
+                      "circle_impact_angle" : self.circle_impact_angle,
+                      "circle_radius"       : self.circle_radius }
                       
         # salvo in un file di nome "<index>_input.json"
         filename = os.path.join( self.new_path, self.folder_name + "_input.json" )
@@ -158,7 +159,7 @@ class Simulation2D():
         self.TIME_TO_IMPACT = 2/30
 
         # Length of the trajectory that we need for the circle to take the desired time to reach the plate
-        self.trajectory = abs(self.TIME_TO_IMPACT * CIRCLE_VELOCITY)
+        self.trajectory = abs(self.TIME_TO_IMPACT * CIRCLE_VELOCITY) + self.circle_radius
 
         # The initial X and Y of the circle are computed using the desired trajectory length and the angle
         self.circle_origin_x = - self.trajectory*math.sin(math.radians(ALPHA))
@@ -264,7 +265,7 @@ class Simulation2D():
 
         #----------- crea PARTI e SET: circle -----------#
 
-        # crea sketch circle, circonferenza con raggio 2.5 mm
+        # crea sketch circle, circonferenza con raggio circle_radius
         sketch_circle = model.ConstrainedSketch( name      = 'sketch-circle', 
                                                  sheetSize = 2*self.circle_radius )
                                                  

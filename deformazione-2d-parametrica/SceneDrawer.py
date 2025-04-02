@@ -3,10 +3,10 @@ import csv
 
 
 # Bisognera' controllare se questi range sono abbastanza/troppo grandi
-MIN_X = -60
-MAX_X = 60
+MIN_X = -90
+MAX_X = 90
 MIN_Y = -10     # il lato sotto della lastra e' a -5
-MAX_Y = 100
+MAX_Y = 110
 
 
 def drawImage(imageName, plateNodesFilename, plateEdgesFilename, circleNodesFilename, circleEdgesFilename):
