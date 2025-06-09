@@ -38,7 +38,7 @@ class Simulation3D():
  
          # OBJECT DIMENSION
         self.plate_width         = 40
-        self.plate_height        = 3
+        self.plate_height        = 2.5
         self.CIRCLE_BASE_RADIUS  = 2.5      # la seed size la calcolo usando questo come riferimento
 
 
@@ -49,9 +49,12 @@ class Simulation3D():
         self.circle_origin_y = 0
 
 
-        # MATERIALS
-        self.circle_density = 2.7E-4
-        self.steel_density = ((8e-6, ),)
+        # MATERIAL: lead
+        self.lead_density = ((1.153e-5,),)
+        self.lead_elastic = ((1.4e4, 0.42),)
+
+        # MATERIAL: 304 stainless steel
+        self.steel_density = ((8e-6,),)
         self.steel_elastic = ((196.5e3, 0.3),)                # (YOUNG'S MODULUS, POISSON RATIO)
         self.steel_plastic = (
             (215, 0),
@@ -64,8 +67,8 @@ class Simulation3D():
 
         # MESH
         self.circle_seed_size          = 1
-        self.plate_seed_sx_dx_min      = 0.5
-        self.plate_seed_sx_dx_max      = 1.2
+        self.plate_seed_sides_min      = 0.5
+        self.plate_seed_sides_max      = 1
         self.plate_seed_top_bottom_min = 0.5
         self.plate_seed_top_bottom_max = 2
 
@@ -100,15 +103,14 @@ class Simulation3D():
                        CIRCLE_VELOCITY,
                        ALPHA_Y,
                        ALPHA_X,
-                       SUMULATION_ID,
-                       SAVEINPUTDATA      = True, 
-                       SAVECIRCLEVELOCITY = True,
-                       SAVEDISPLACEMENT   = True, 
-                       SAVEEDGES          = True,
-                       SAVECOORDINATES    = True,
-                       SAVESTRESS         = False, 
-                       SAVEDATABASE       = False, 
-                       SAVEJOBINPUT       = False ):
+                       SIMULATION_ID,
+                       SAVEINPUTDATA        = True, 
+                       SAVECIRCLEVELOCITY   = True,
+                       SAVEDISPLACEMENT     = True, 
+                       SAVECOORDINATES      = True,
+                       SAVEDATABASE         = True, 
+                       SAVEPLATECOORDINATES = False,
+                       SAVEJOBINPUT         = False ):
               
 
         #*************************
@@ -117,7 +119,7 @@ class Simulation3D():
         Mdb()
 
         # salva parametri
-        self.index = SUMULATION_ID
+        self.index = SIMULATION_ID
         self.circle_radius = CIRCLE_RADIUS
         self.circle_speed = CIRCLE_VELOCITY
         self.circle_impact_angle_y = ALPHA_Y
@@ -142,7 +144,6 @@ class Simulation3D():
 
         # Length of the trajectory that we need for the circle to take the desired time to reach the plate
         self.trajectory = abs(self.TIME_TO_IMPACT * CIRCLE_VELOCITY) + self.circle_radius
-        #self.trajectory = 3
 
         # The initial X and Y of the circle are computed using the desired trajectory length and the angle
         self.circle_origin_y = self.trajectory * math.cos(math.radians(ALPHA_Y)) + self.circle_radius
@@ -170,7 +171,7 @@ class Simulation3D():
         self.time_period += abs(self.circle_speed_y/15000)
         
         # TEMP
-        #self.time_period = 0.01
+        #self.time_period = 0.07
         
         
         #************************
@@ -304,8 +305,8 @@ class Simulation3D():
         
         
         material_circle = model.Material( name = 'material-circle' )
-        material_circle.Density( table = ( ( self.circle_density, ), ) )
-        material_circle.Elastic( table = self.steel_elastic )
+        material_circle.Density( table = self.lead_density )
+        material_circle.Elastic( table = self.lead_elastic )
 
 
 
@@ -377,7 +378,6 @@ class Simulation3D():
                          bodyRegion     = model.rootAssembly.instances['circle'].sets['set-all'] )
 
 
-
         #----------- FILTER per fermare l'analisi quando la palla si ferma o rimbalza verso l'alto -----------#
         
         # crea filtro
@@ -389,7 +389,6 @@ class Simulation3D():
                                          limit           = 0,         # se la palla ha velocita' verticale zero o si e' fermata o sta per rimbalzare
                                          halt            = True )      # per far fermare l'analisi quando il valore limit e' raggiunto
     
-    
         # aggiungi una history output request per la velocita' verticale della palla, in modo da potergli applicare un filtro
         model.HistoryOutputRequest( name           = 'H-Output-Circle-V2', 
                                     createStepName = 'Step-1', 
@@ -397,8 +396,7 @@ class Simulation3D():
                                     variables      = ('V2',),        # velocita' verticale
                                     frequency      = 200,
                                     filter         = "Filter-1" )
-
-
+        
 
         #----------- BOUNDARY CONDITION -----------#
 
@@ -484,9 +482,8 @@ class Simulation3D():
         part_plate.seedEdgeByBias( biasMethod = abaqusConstants.SINGLE, 
                                    end2Edges = (edge_ne, edge_sw), 
                                    end1Edges  = (edge_nw, edge_se), 
-                                   minSize    = self.plate_seed_sx_dx_min, 
-                                   maxSize    = self.plate_seed_sx_dx_max )
-
+                                   minSize    = self.plate_seed_sides_min, 
+                                   maxSize    = self.plate_seed_sides_max )
 
         part_plate.generateMesh()
 
@@ -563,15 +560,31 @@ class Simulation3D():
         # LOADING DATABASE
         odb = session.openOdb(JOB_NAME + '.odb')
 
-        # GETTING LAST FRAME AVAILABLE
+        # GETTING THE FRAMES
+        firstFrame = odb.steps['Step-1'].frames[0]
         lastFrame = odb.steps['Step-1'].frames[-1]
+
+
+        # Frame 1/30 secondi prima dell'impatto
+        frameOne30BeforeImpact = None
+
+        for frame in odb.steps['Step-1'].frames:
+            # visto che la simulazione e' fatta nel dominio del tempo (il campo domain di Step e' AbaqusConstants.TIME),
+            # allora frameValue e' il tempo del frame
+            if (frame.frameValue >= 1/30):
+                #log("found frame one")
+                frameOne30BeforeImpact = frame
+                break
+
+        if (frameOne30BeforeImpact == None):
+            log("frame one not found")
 
 
         # REGIONS OF INTEREST
         #outputRegion         = odb.rootAssembly.instances['PLATE'].nodeSets['SET-ALL']
         outputRegionExternal = odb.rootAssembly.instances['PLATE'].nodeSets['SURFACE-ALL']
         #outputRegionCircle = odb.rootAssembly.instances['CIRCLE'].nodeSets['SET-ALL']
-        #outputRegionCircleExternal = odb.rootAssembly.instances['CIRCLE'].nodeSets['SURFACE']
+        outputRegionCircleExternal = odb.rootAssembly.instances['CIRCLE'].nodeSets['SURFACE']
 
 
         # SAVING CIRCLE VELOCITY
@@ -583,10 +596,51 @@ class Simulation3D():
             velocity_df = pd.DataFrame( { 'Time'     : [ time for time, _ in v2Data ] ,
                                         'Velocity' : [ v2   for _, v2   in v2Data ] } )
             
-            velocity_output_filename = os.path.join( self.new_path, str(self.index) + '_circle_velocity_y.csv' )
+            velocity_output_filename = os.path.join(self.new_path, str(self.index) + '_circle_velocity_y.csv')
         
         
-            velocity_df.to_csv( velocity_output_filename, index = False )
+            velocity_df.to_csv(velocity_output_filename, index = False)
+
+
+
+        # SAVING COORDINATES OF PLATE
+        if SAVEPLATECOORDINATES:
+
+            # ****** Initial coordinates ******
+            coordinates_plate = firstFrame.fieldOutputs['COORD'].getSubset(region = outputRegionExternal)
+            coordinates_plate_df = pd.DataFrame( { 'Id'       : [ values.nodeLabel for values in coordinates_plate.values ],
+                                                    'X_Coord' : [ values.data[0]   for values in coordinates_plate.values ],
+                                                    'Y_Coord' : [ values.data[1]   for values in coordinates_plate.values ],
+                                                    'Z_Coord' : [ values.data[2]   for values in coordinates_plate.values ] } )
+            coordinate_plate_filename = os.path.join(self.new_path, 'plate_initial_coordinates.csv')
+            coordinates_plate_df.to_csv(coordinate_plate_filename, index = False)
+
+
+
+        # SAVING COORDINATES OF SPHERE
+        if SAVECOORDINATES:
+
+            # ****** Initial coordinates = 2/30 seconds before impact ******
+            coordinates_circle_1 = firstFrame.fieldOutputs['COORD'].getSubset(region = outputRegionCircleExternal)
+            coordinates_circle_1_df = pd.DataFrame( { 'Id'      : [ values.nodeLabel for values in coordinates_circle_1.values ],
+                                                      'X_Coord' : [ values.data[0]   for values in coordinates_circle_1.values ],
+                                                      'Y_Coord' : [ values.data[1]   for values in coordinates_circle_1.values ],
+                                                      'Z_Coord' : [ values.data[2]   for values in coordinates_circle_1.values ] } )
+            coordinate_circle_1_filename = os.path.join(self.new_path, str(self.index) + '_input_coordinates_circle_1.csv')
+            coordinates_circle_1_df.to_csv(coordinate_circle_1_filename, index = False)
+
+
+            # ****** Coordinates 1/30 seconds before impact ******
+            if (frameOne30BeforeImpact != None):
+                coordinates_circle_2 = frameOne30BeforeImpact.fieldOutputs['COORD'].getSubset( region = outputRegionCircleExternal )                
+                coordinates_circle_2_df = pd.DataFrame( { 'Id'    : [ values.nodeLabel for values in coordinates_circle_2.values ],
+                                                        'X_Coord' : [ values.data[0]   for values in coordinates_circle_2.values ],
+                                                        'Y_Coord' : [ values.data[1]   for values in coordinates_circle_2.values ],
+                                                        'Z_Coord' : [ values.data[2]   for values in coordinates_circle_2.values ] } )
+                coordinate_circle_2_filename = os.path.join(self.new_path, str(self.index) + '_input_coordinates_circle_2.csv')
+                coordinates_circle_2_df.to_csv(coordinate_circle_2_filename, index = False)
+
+
 
 
         # SAVING PLATE DISPLACEMENTS
@@ -644,14 +698,14 @@ class Simulation3D():
 
 
 
-
+'''
 ########## DA TOGLIERE ##########
 
 idx = 3
-radius = 2.5
-velocity = 3000
-alpha_Y = 38
-alpha_X = -180
+radius = 4.5
+velocity = 8000
+alpha_Y = 0 #38
+alpha_X = 0 #-180
 
 start = time.time()
 
@@ -662,7 +716,7 @@ sim = Simulation3D()
     ALPHA_Y         = alpha_Y,
     ALPHA_X         = alpha_X,
     SUMULATION_ID   = idx,
-    SAVEDATABASE    = True
+    SAVEPLATECOORDINATES = True
 )
 
 simulation_time = str(time.time() - start)
@@ -670,3 +724,4 @@ simulation_time = str(time.time() - start)
 log("sim length: " + str(simulation_length))
 log("completed: " + str(simulation_completed))
 log("sim total time: " + simulation_time)
+'''
