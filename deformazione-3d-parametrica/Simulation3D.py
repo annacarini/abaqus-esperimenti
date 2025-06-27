@@ -539,7 +539,7 @@ class Simulation3D():
         #*******************
         # SUBMITTING THE JOB:
         #*******************
-        log("submitting the job")
+        #log("submitting the job")
         job.submit()
         job.waitForCompletion()
 

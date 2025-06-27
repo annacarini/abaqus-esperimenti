@@ -1,0 +1,810 @@
+# -*- coding: mbcs -*-
+from mesh import *
+from part import *
+from material import *
+from section import *
+from assembly import *
+from step import *
+from interaction import *
+from load import *
+from optimization import *
+from job import *
+from sketch import *
+from visualization import *
+from connectorBehavior import *
+mdb.Model(name='Simulation_4')
+del mdb.models['Model-1']
+mdb.models['Simulation_4'].ConstrainedSketch(name='sketch-plate', sheetSize=40)
+mdb.models['Simulation_4'].sketches['sketch-plate'].rectangle((-20.0, 0), (
+    20.0, -1))
+mdb.models['Simulation_4'].Part(dimensionality=THREE_D, name='plate', type=
+    DEFORMABLE_BODY)
+mdb.models['Simulation_4'].parts['plate'].BaseSolidExtrude(depth=40, sketch=
+    mdb.models['Simulation_4'].sketches['sketch-plate'])
+mdb.models['Simulation_4'].parts['plate'].Set(cells=
+    mdb.models['Simulation_4'].parts['plate'].cells, name='set-all')
+mdb.models['Simulation_4'].parts['plate'].Set(faces=
+    mdb.models['Simulation_4'].parts['plate'].faces.getSequenceFromMask(mask=(
+    '[#8 ]', ), ), name='surface-top')
+mdb.models['Simulation_4'].parts['plate'].Set(faces=
+    mdb.models['Simulation_4'].parts['plate'].faces.getSequenceFromMask(mask=(
+    '[#2 ]', ), ), name='surface-bottom')
+mdb.models['Simulation_4'].parts['plate'].Set(faces=
+    mdb.models['Simulation_4'].parts['plate'].faces.getSequenceFromMask(mask=(
+    '[#4 ]', ), ), name='surface-west')
+mdb.models['Simulation_4'].parts['plate'].Set(faces=
+    mdb.models['Simulation_4'].parts['plate'].faces.getSequenceFromMask(mask=(
+    '[#1 ]', ), ), name='surface-east')
+mdb.models['Simulation_4'].parts['plate'].Set(faces=
+    mdb.models['Simulation_4'].parts['plate'].faces.getSequenceFromMask(mask=(
+    '[#20 ]', ), ), name='surface-north')
+mdb.models['Simulation_4'].parts['plate'].Set(faces=
+    mdb.models['Simulation_4'].parts['plate'].faces.getSequenceFromMask(mask=(
+    '[#10 ]', ), ), name='surface-south')
+mdb.models['Simulation_4'].parts['plate'].Surface(name='surface-top', 
+    side1Faces=
+    mdb.models['Simulation_4'].parts['plate'].faces.getSequenceFromMask(mask=(
+    '[#8 ]', ), ))
+mdb.models['Simulation_4'].parts['plate'].Set(faces=
+    mdb.models['Simulation_4'].parts['plate'].faces, name='surface-all')
+mdb.models['Simulation_4'].ConstrainedSketch(name='sketch-circle', sheetSize=
+    5.0)
+mdb.models['Simulation_4'].sketches['sketch-circle'].ArcByCenterEnds(center=(0, 
+    0), direction=CLOCKWISE, point1=(0, 2.5), point2=(0, -2.5))
+mdb.models['Simulation_4'].sketches['sketch-circle'].Line(point1=(0, 2.5), 
+    point2=(0, -2.5))
+mdb.models['Simulation_4'].sketches['sketch-circle'].ConstructionLine(point1=(
+    0, 2.5), point2=(0, -2.5))
+mdb.models['Simulation_4'].sketches['sketch-circle'].assignCenterline(
+    mdb.models['Simulation_4'].sketches['sketch-circle'].geometry[4])
+mdb.models['Simulation_4'].Part(dimensionality=THREE_D, name='circle', type=
+    DEFORMABLE_BODY)
+mdb.models['Simulation_4'].parts['circle'].BaseSolidRevolve(angle=360, sketch=
+    mdb.models['Simulation_4'].sketches['sketch-circle'])
+mdb.models['Simulation_4'].parts['circle'].DatumPlaneByPrincipalPlane(offset=
+    0.0, principalPlane=XYPLANE)
+mdb.models['Simulation_4'].parts['circle'].DatumPlaneByPrincipalPlane(offset=
+    0.0, principalPlane=XZPLANE)
+mdb.models['Simulation_4'].parts['circle'].DatumPlaneByPrincipalPlane(offset=
+    0.0, principalPlane=YZPLANE)
+mdb.models['Simulation_4'].parts['circle'].PartitionFaceByDatumPlane(
+    datumPlane=mdb.models['Simulation_4'].parts['circle'].datums[2], faces=
+    mdb.models['Simulation_4'].parts['circle'].faces)
+mdb.models['Simulation_4'].parts['circle'].PartitionFaceByDatumPlane(
+    datumPlane=mdb.models['Simulation_4'].parts['circle'].datums[3], faces=
+    mdb.models['Simulation_4'].parts['circle'].faces)
+mdb.models['Simulation_4'].parts['circle'].PartitionFaceByDatumPlane(
+    datumPlane=mdb.models['Simulation_4'].parts['circle'].datums[4], faces=
+    mdb.models['Simulation_4'].parts['circle'].faces)
+mdb.models['Simulation_4'].parts['circle'].Set(cells=
+    mdb.models['Simulation_4'].parts['circle'].cells, name='set-all')
+mdb.models['Simulation_4'].parts['circle'].Set(faces=
+    mdb.models['Simulation_4'].parts['circle'].faces, name='surface')
+mdb.models['Simulation_4'].parts['circle'].Surface(name='surface', side1Faces=
+    mdb.models['Simulation_4'].parts['circle'].faces)
+mdb.models['Simulation_4'].Material(name='material-plate')
+mdb.models['Simulation_4'].materials['material-plate'].Density(table=((8e-06, 
+    ), ))
+mdb.models['Simulation_4'].materials['material-plate'].Elastic(table=((
+    196500.0, 0.3), ))
+mdb.models['Simulation_4'].materials['material-plate'].Plastic(table=((215, 0), 
+    (496.8, 0.0975), (687.6, 0.1965), (893.6, 0.2955), (1086.6, 0.3945)))
+mdb.models['Simulation_4'].materials['material-plate'].DuctileDamageInitiation(
+    table=((0.3945, 0.3333, 0), ))
+mdb.models['Simulation_4'].materials['material-plate'].ductileDamageInitiation.DamageEvolution(
+    table=((0.3, ), ), type=DISPLACEMENT)
+mdb.models['Simulation_4'].Material(name='material-circle')
+mdb.models['Simulation_4'].materials['material-circle'].Density(table=((
+    1.153e-05, ), ))
+mdb.models['Simulation_4'].materials['material-circle'].Elastic(table=((
+    14000.0, 0.42), ))
+mdb.models['Simulation_4'].HomogeneousSolidSection(material='material-plate', 
+    name='section-plate', thickness=None)
+mdb.models['Simulation_4'].parts['plate'].SectionAssignment(region=
+    mdb.models['Simulation_4'].parts['plate'].sets['set-all'], sectionName=
+    'section-plate')
+mdb.models['Simulation_4'].HomogeneousSolidSection(material='material-circle', 
+    name='section-circle', thickness=None)
+mdb.models['Simulation_4'].parts['circle'].SectionAssignment(region=
+    mdb.models['Simulation_4'].parts['circle'].sets['set-all'], sectionName=
+    'section-circle')
+mdb.models['Simulation_4'].rootAssembly.DatumCsysByDefault(CARTESIAN)
+mdb.models['Simulation_4'].rootAssembly.Instance(dependent=ON, name='plate', 
+    part=mdb.models['Simulation_4'].parts['plate'])
+mdb.models['Simulation_4'].rootAssembly.instances['plate'].translate((0, 0, 
+    -20.0))
+mdb.models['Simulation_4'].rootAssembly.Instance(dependent=ON, name='circle', 
+    part=mdb.models['Simulation_4'].parts['circle'])
+mdb.models['Simulation_4'].rootAssembly.instances['circle'].translate((
+    -580.381358102871, 338.583333333333, -0.0))
+mdb.models['Simulation_4'].ExplicitDynamicsStep(description='', name='Step-1', 
+    previous='Initial', timeIncrementationMethod=AUTOMATIC_GLOBAL, timePeriod=
+    0.4)
+mdb.models['Simulation_4'].FieldOutputRequest(createStepName='Step-1', 
+    frequency=40, name='F-Output-1', variables=('S', 'E', 'U', 'COORD'))
+mdb.models['Simulation_4'].rootAssembly.ReferencePoint(point=(
+    -580.381358102871, 338.583333333333, -0.0))
+mdb.models['Simulation_4'].rootAssembly.Set(name='circle-rp', referencePoints=(
+    mdb.models['Simulation_4'].rootAssembly.referencePoints[6], ))
+mdb.models['Simulation_4'].RigidBody(bodyRegion=
+    mdb.models['Simulation_4'].rootAssembly.instances['circle'].sets['set-all']
+    , name='constraint-circle-rigid-body', refPointRegion=Region(
+    referencePoints=(
+    mdb.models['Simulation_4'].rootAssembly.referencePoints[6], )))
+mdb.models['Simulation_4'].ButterworthFilter(cutoffFrequency=10000, halt=True, 
+    limit=0, name='Filter-Circle-V2', operation=MAX)
+mdb.models['Simulation_4'].HistoryOutputRequest(createStepName='Step-1', 
+    filter='Filter-Circle-V2', frequency=200, name='H-Output-Circle-V2', 
+    region=mdb.models['Simulation_4'].rootAssembly.sets['circle-rp'], 
+    variables=('V2', ))
+mdb.models['Simulation_4'].ButterworthFilter(cutoffFrequency=10000, halt=True, 
+    limit=-13.5, name='Filter-Circle-COOR2', operation=MIN)
+mdb.models['Simulation_4'].HistoryOutputRequest(createStepName='Step-1', 
+    filter='Filter-Circle-COOR2', frequency=200, name='H-Output-Circle-COOR2', 
+    region=mdb.models['Simulation_4'].rootAssembly.sets['circle-rp'], 
+    variables=('COOR2', ))
+mdb.models['Simulation_4'].parts['plate'].SetByBoolean(name='surface-sides', 
+    sets=(mdb.models['Simulation_4'].parts['plate'].sets['surface-north'], 
+    mdb.models['Simulation_4'].parts['plate'].sets['surface-south'], 
+    mdb.models['Simulation_4'].parts['plate'].sets['surface-west'], 
+    mdb.models['Simulation_4'].parts['plate'].sets['surface-east']))
+mdb.models['Simulation_4'].DisplacementBC(createStepName='Initial', name=
+    'FixedBC', region=
+    mdb.models['Simulation_4'].rootAssembly.instances['plate'].sets['surface-sides']
+    , u1=0.0, u2=0.0, u3=0.0)
+mdb.models['Simulation_4'].Velocity(name='Velocity', region=Region(
+    referencePoints=(
+    mdb.models['Simulation_4'].rootAssembly.referencePoints[6], )), velocity1=
+    8660.25403784439, velocity2=-5000.0, velocity3=0.0)
+mdb.models['Simulation_4'].ContactProperty('IntProp-1')
+mdb.models['Simulation_4'].interactionProperties['IntProp-1'].TangentialBehavior(
+    formulation=PENALTY, fraction=0.005, maximumElasticSlip=FRACTION, table=((
+    0.5, ), ))
+mdb.models['Simulation_4'].interactionProperties['IntProp-1'].NormalBehavior(
+    pressureOverclosure=HARD)
+mdb.models['Simulation_4'].SurfaceToSurfaceContactExp(createStepName='Initial', 
+    interactionProperty='IntProp-1', main=
+    mdb.models['Simulation_4'].rootAssembly.instances['circle'].surfaces['surface']
+    , name='Int-1', secondary=
+    mdb.models['Simulation_4'].rootAssembly.instances['plate'].surfaces['surface-top']
+    , sliding=FINITE)
+mdb.models['Simulation_4'].parts['plate'].seedEdgeByBias(biasMethod=DOUBLE, 
+    centerEdges=(mdb.models['Simulation_4'].parts['plate'].edges[11], 
+    mdb.models['Simulation_4'].parts['plate'].edges[10], 
+    mdb.models['Simulation_4'].parts['plate'].edges[3], 
+    mdb.models['Simulation_4'].parts['plate'].edges[8], 
+    mdb.models['Simulation_4'].parts['plate'].edges[6], 
+    mdb.models['Simulation_4'].parts['plate'].edges[4], 
+    mdb.models['Simulation_4'].parts['plate'].edges[1], 
+    mdb.models['Simulation_4'].parts['plate'].edges[5]), maxSize=2, minSize=
+    0.5)
+mdb.models['Simulation_4'].parts['plate'].seedEdgeBySize(edges=(
+    mdb.models['Simulation_4'].parts['plate'].edges[2], 
+    mdb.models['Simulation_4'].parts['plate'].edges[7], 
+    mdb.models['Simulation_4'].parts['plate'].edges[9], 
+    mdb.models['Simulation_4'].parts['plate'].edges[0]), size=1)
+mdb.models['Simulation_4'].parts['plate'].generateMesh()
+mdb.models['Simulation_4'].parts['circle'].seedPart(size=1)
+mdb.models['Simulation_4'].parts['circle'].setMeshControls(elemShape=TET, 
+    regions=mdb.models['Simulation_4'].parts['circle'].cells)
+mdb.models['Simulation_4'].parts['circle'].generateMesh()
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=0.0, coordinate3=3.5, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[0])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=3.5, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[1])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=-3.5, 
+    coordinate2=0.0, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[2])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=3.5, 
+    coordinate2=0.0, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[3])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=0.0, coordinate3=-3.5, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[4])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=-3.5, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[5])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=1.33939205408096, coordinate3=3.23357834815979, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[6])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=2.47487373352051, coordinate3=2.47487373352051, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[7])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=3.23357834815979, coordinate3=1.33939205408096, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[8])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.33939205408096, coordinate2=3.23357834815979, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[9])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.47487373352051, coordinate2=2.47487373352051, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[10])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -3.23357834815979, coordinate2=1.33939205408096, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[11])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -3.23357834815979, coordinate2=0.0, coordinate3=1.33939205408096, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[12])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.47487373352051, coordinate2=0.0, coordinate3=2.47487373352051, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[13])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.33939205408096, coordinate2=0.0, coordinate3=3.23357834815979, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[14])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.33939205408096, coordinate2=0.0, coordinate3=3.23357834815979, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[15])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.47487373352051, coordinate2=0.0, coordinate3=2.47487373352051, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[16])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    3.23357834815979, coordinate2=0.0, coordinate3=1.33939205408096, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[17])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    3.23357834815979, coordinate2=1.33939205408096, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[18])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.47487373352051, coordinate2=2.47487373352051, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[19])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.33939205408096, coordinate2=3.23357834815979, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[20])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=3.23357834815979, coordinate3=-1.33939205408096, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[21])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=2.47487373352051, coordinate3=-2.47487373352051, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[22])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=1.33939205408096, coordinate3=-3.23357834815979, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[23])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.33939205408096, coordinate2=0.0, coordinate3=-3.23357834815979, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[24])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.47487373352051, coordinate2=0.0, coordinate3=-2.47487373352051, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[25])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -3.23357834815979, coordinate2=0.0, coordinate3=-1.33939205408096, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[26])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=-3.23357834815979, coordinate3=1.33939205408096, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[27])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=-2.47487373352051, coordinate3=2.47487373352051, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[28])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=-1.33939205408096, coordinate3=3.23357834815979, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[29])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -3.23357834815979, coordinate2=-1.33939205408096, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[30])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.47487373352051, coordinate2=-2.47487373352051, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[31])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.33939205408096, coordinate2=-3.23357834815979, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[32])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.33939205408096, coordinate2=-3.23357834815979, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[33])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.47487373352051, coordinate2=-2.47487373352051, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[34])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    3.23357834815979, coordinate2=-1.33939205408096, coordinate3=0.0, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[35])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    3.23357834815979, coordinate2=0.0, coordinate3=-1.33939205408096, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[36])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.47487373352051, coordinate2=0.0, coordinate3=-2.47487373352051, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[37])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.33939205408096, coordinate2=0.0, coordinate3=-3.23357834815979, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[38])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=-1.33939205408096, coordinate3=-3.23357834815979, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[39])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=-2.47487373352051, coordinate3=-2.47487373352051, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[40])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=0.0, 
+    coordinate2=-3.23357834815979, coordinate3=-1.33939205408096, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[41])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.1887448310852, coordinate2=1.77524890899658, coordinate3=
+    2.77225136756897, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[42])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.1853143453598, coordinate2=2.77704954147339, coordinate3=1.7700355052948
+    , nodes=mdb.models['Simulation_4'].parts['circle'].nodes[43])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.95707767009735, coordinate2=2.05684998035431, coordinate3=
+    2.0467572927475, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[44])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.08141512870789, coordinate2=1.1434567451477, coordinate3=
+    2.57103431224823, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[45])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.76970891952515, coordinate2=1.51542870998383, coordinate3=
+    1.51069111824036, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[46])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.07801251411438, coordinate2=2.57611303329468, coordinate3=
+    1.13820286989212, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[47])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.76861057281494, coordinate2=1.23485261201859, coordinate3=
+    2.75629389286041, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[48])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.98554611206055, coordinate2=2.09715714454651, coordinate3=
+    1.97725536823273, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[49])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.58200836181641, coordinate2=2.11145002841949, coordinate3=
+    1.06066579818726, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[50])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.63992354869843, coordinate2=2.81466355323791, coordinate3=
+    1.27996896505356, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[51])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.42547872066498, coordinate2=2.50452160835266, coordinate3=
+    1.98629863262177, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[52])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.06165739297867, coordinate2=2.17284245491028, coordinate3=
+    2.53014602661133, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[53])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.85766373872757, coordinate2=2.74325404167175, coordinate3=
+    1.99724063873291, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[54])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.77340142726898, coordinate2=1.23126908540726, coordinate3=
+    1.74419646263123, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[55])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.76861057281494, coordinate2=1.23485261201859, coordinate3=
+    -2.75629389286041, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[56])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.98554611206055, coordinate2=2.09715714454651, coordinate3=
+    -1.97725536823273, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[57])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.58200836181641, coordinate2=2.11145002841949, coordinate3=
+    -1.06066579818726, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[58])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.63992354869843, coordinate2=2.81466355323791, coordinate3=
+    -1.27996896505356, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[59])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.42547872066498, coordinate2=2.50452160835266, coordinate3=
+    -1.98629863262177, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[60])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.06165739297867, coordinate2=2.17284245491028, coordinate3=
+    -2.53014602661133, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[61])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.85766373872757, coordinate2=2.74325404167175, coordinate3=
+    -1.99724063873291, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[62])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.77340142726898, coordinate2=1.23126908540726, coordinate3=
+    -1.74419646263123, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[63])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.76861057281494, coordinate2=-1.23485261201859, coordinate3=
+    2.75629389286041, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[64])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.98554611206055, coordinate2=-2.09715714454651, coordinate3=
+    1.97725536823273, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[65])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.58200836181641, coordinate2=-2.11145002841949, coordinate3=
+    1.06066579818726, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[66])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.63992354869843, coordinate2=-2.81466355323791, coordinate3=
+    1.27996896505356, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[67])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.42547872066498, coordinate2=-2.50452160835266, coordinate3=
+    1.98629863262177, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[68])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.06165739297867, coordinate2=-2.17284245491028, coordinate3=
+    2.53014602661133, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[69])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.85766373872757, coordinate2=-2.74325404167175, coordinate3=
+    1.99724063873291, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[70])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.77340142726898, coordinate2=-1.23126908540726, coordinate3=
+    1.74419646263123, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[71])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=1.1887448310852
+    , coordinate2=-1.77524890899658, coordinate3=2.77225136756897, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[72])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=1.1853143453598
+    , coordinate2=-2.77704954147339, coordinate3=1.7700355052948, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[73])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.95707767009735, coordinate2=-2.05684998035431, coordinate3=
+    2.0467572927475, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[74])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.08141512870789, coordinate2=-1.1434567451477, coordinate3=
+    2.57103431224823, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[75])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.76970891952515, coordinate2=-1.51542870998383, coordinate3=
+    1.51069111824036, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[76])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.07801251411438, coordinate2=-2.57611303329468, coordinate3=
+    1.13820286989212, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[77])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=1.1887448310852
+    , coordinate2=1.77524890899658, coordinate3=-2.77225136756897, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[78])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=1.1853143453598
+    , coordinate2=2.77704954147339, coordinate3=-1.7700355052948, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[79])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.95707767009735, coordinate2=2.05684998035431, coordinate3=
+    -2.0467572927475, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[80])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.08141512870789, coordinate2=1.1434567451477, coordinate3=
+    -2.57103431224823, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[81])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.76970891952515, coordinate2=1.51542870998383, coordinate3=
+    -1.51069111824036, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[82])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.07801251411438, coordinate2=2.57611303329468, coordinate3=
+    -1.13820286989212, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[83])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.1887448310852, coordinate2=-1.77524890899658, coordinate3=
+    -2.77225136756897, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[84])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.1853143453598, coordinate2=-2.77704954147339, coordinate3=
+    -1.7700355052948, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[85])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.95707767009735, coordinate2=-2.05684998035431, coordinate3=
+    -2.0467572927475, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[86])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.08141512870789, coordinate2=-1.1434567451477, coordinate3=
+    -2.57103431224823, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[87])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.76970891952515, coordinate2=-1.51542870998383, coordinate3=
+    -1.51069111824036, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[88])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.07801251411438, coordinate2=-2.57611303329468, coordinate3=
+    -1.13820286989212, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[89])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.76861057281494, coordinate2=-1.23485261201859, coordinate3=
+    -2.75629389286041, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[90])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.98554611206055, coordinate2=-2.09715714454651, coordinate3=
+    -1.97725536823273, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[91])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.58200836181641, coordinate2=-2.11145002841949, coordinate3=
+    -1.06066579818726, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[92])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.63992354869843, coordinate2=-2.81466355323791, coordinate3=
+    -1.27996896505356, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[93])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.42547872066498, coordinate2=-2.50452160835266, coordinate3=
+    -1.98629863262177, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[94])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.06165739297867, coordinate2=-2.17284245491028, coordinate3=
+    -2.53014602661133, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[95])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.85766373872757, coordinate2=-2.74325404167175, coordinate3=
+    -1.99724063873291, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[96])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.77340142726898, coordinate2=-1.23126908540726, coordinate3=
+    -1.74419646263123, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[97])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.190438833832741, coordinate2=-0.583983784914017, coordinate3=
+    1.76509079933166, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[98])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.388619124889374, coordinate2=-1.37543460130692, coordinate3=
+    2.16792879104614, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[99])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.607462209463119, coordinate2=-2.13843278884888, coordinate3=
+    1.26743279695511, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[100])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.868998861312866, coordinate2=-1.68654327392578, coordinate3=
+    1.62785601615906, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[101])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.56167693138123, coordinate2=-1.3352977514267, coordinate3=
+    1.60081267356873, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[102])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.17946157455444, coordinate2=-0.374310803413391, coordinate3=
+    2.23671991825104, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[103])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.11891688108444, coordinate2=-0.738061368465424, coordinate3=
+    2.05686917304993, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[104])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.405794543027878, coordinate2=-1.92819316387177, coordinate3=
+    0.638542026281357, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[105])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.08096290826797, coordinate2=-2.15864336490631, coordinate3=
+    0.143978105485439, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[106])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.435281157493591, coordinate2=1.98898344039917, coordinate3=
+    1.6939638376236, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[107])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.326290595531464, coordinate2=2.39440910816193, coordinate3=
+    0.30112010538578, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[108])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.43352196216583, coordinate2=1.81374778747559, coordinate3=
+    1.45935399532318, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[109])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.683176350593567, coordinate2=0.380816459655762, coordinate3=
+    1.62071282863617, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[110])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.665164214372635, coordinate2=1.18746242523193, coordinate3=
+    2.11999628543854, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[111])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.206799250841141, coordinate2=1.17585226297379, coordinate3=
+    2.15767705440521, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[112])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.08386501073837, coordinate2=1.55784022808075, coordinate3=
+    1.08846099376678, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[113])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=1.2701544880867
+    , coordinate2=-1.68884823322296, coordinate3=-1.3265790104866, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[114])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.969768607616424, coordinate2=-1.4710874080658, coordinate3=
+    -2.25993857383728, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[115])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.226598310470581, coordinate2=-1.54211657047272, coordinate3=
+    -1.46311492919922, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[116])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.234256842732429, coordinate2=2.33218739032745, coordinate3=
+    -0.486166208982468, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[117])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.0441341668367386, coordinate2=1.1952141046524, coordinate3=
+    -0.130264382064342, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[118])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.27970986366272, coordinate2=1.98470096588135, coordinate3=
+    -1.02449716329575, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[119])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.03569451570511, coordinate2=1.4616756439209, coordinate3=
+    0.512968015670776, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[120])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.510113769769669, coordinate2=0.597828310728073, coordinate3=
+    1.395012819767, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[121])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.459443801641464, coordinate2=0.271511992812157, coordinate3=
+    0.120374615490437, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[122])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.981799173355102, coordinate2=0.418281769752502, coordinate3=
+    0.219343262910843, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[123])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.12944626808167, coordinate2=0.709342753887176, coordinate3=
+    0.848947083950043, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[124])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.425352358818054, coordinate2=-0.583806419372559, coordinate3=
+    0.768857800960541, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[125])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.95999368429184, coordinate2=-0.623853689432144, coordinate3=
+    0.681877171993256, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[126])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.77087094783783, coordinate2=1.76114094257355, coordinate3=
+    -1.76187260150909, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[127])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.497496157884598, coordinate2=1.66424837112427, coordinate3=
+    -1.71459515094757, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[128])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.73265380859375, coordinate2=0.814753210544586, coordinate3=
+    -1.41942684650421, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[129])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.520756912231445, coordinate2=0.553389084339142, coordinate3=
+    -2.43354334831238, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[130])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.702352857589722, coordinate2=0.194487595558166, coordinate3=
+    -1.30120902061462, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[131])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.32540600001812, coordinate2=-1.08860285282135, coordinate3=
+    -0.427106487751007, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[132])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.508780920505524, coordinate2=0.353081303834915, coordinate3=
+    -1.88281512260437, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[133])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.30264471769333, coordinate2=1.17588856220245, coordinate3=
+    -0.326355329155922, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[134])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.63743717670441, coordinate2=-0.51775016784668, coordinate3=
+    -0.536902725696564, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[135])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.16206517219543, coordinate2=0.334503400325775, coordinate3=
+    0.143240271508694, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[136])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.21538665294647, coordinate2=0.788004183769226, coordinate3=
+    -0.52013435959816, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[137])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.77529547214508, coordinate2=-0.524506372213364, coordinate3=
+    0.956976342201233, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[138])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.15282847881317, coordinate2=-0.308955127000809, coordinate3=
+    1.40331783294678, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[139])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.61994211673737, coordinate2=-1.37620656490326, coordinate3=
+    0.536797624826431, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[140])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.90916385650635, coordinate2=0.616216415166855, coordinate3=
+    0.988300406932831, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[141])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.78990795612335, coordinate2=-0.706063306331634, coordinate3=
+    -1.6137969493866, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[142])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.76490721702576, coordinate2=0.634802329540253, coordinate3=
+    -1.75921516418457, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[143])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.33570549488068, coordinate2=0.366274487972259, coordinate3=
+    -0.670693963766098, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[144])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.44739928245544, coordinate2=-1.91620123386383, coordinate3=
+    -0.579021596908569, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[145])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.878618574142456, coordinate2=-1.28589016199112, coordinate3=
+    -1.55795905590057, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[146])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.25094468593597, coordinate2=-0.963192439079285, coordinate3=
+    -2.34990859031677, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[147])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.25960245132446, coordinate2=-0.405211460590363, coordinate3=
+    -1.01470046043396, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[148])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.63031969070435, coordinate2=-0.571860551834106, coordinate3=
+    -1.6845737695694, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[149])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.64368214607239, coordinate2=-1.34722183942795, coordinate3=
+    0.147649522125721, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[150])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    2.26022846698761, coordinate2=-0.136954528093338, coordinate3=
+    0.173752944171429, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[151])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.941495180130005, coordinate2=-0.700425827503204, coordinate3=
+    -0.328277060389519, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[152])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.37553256750107, coordinate2=-2.04710042476654, coordinate3=
+    1.11371924877167, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[153])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.82201116085052, coordinate2=1.77669486999512, coordinate3=
+    0.398025131225586, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[154])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -2.2937616109848, coordinate2=-0.455482387542725, coordinate3=
+    0.398042863607407, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[155])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.528396815061569, coordinate2=-2.55746440887451, coordinate3=
+    -0.627892249822616, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[156])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    0.670283824205399, coordinate2=-0.406365650892258, coordinate3=
+    -2.2511271238327, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[157])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    1.73097953796387, coordinate2=-1.52900362014771, coordinate3=
+    1.04121850728989, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[158])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.78101623058319, coordinate2=1.70686433315277, coordinate3=
+    -0.964950156211853, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[159])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.506302684545517, coordinate2=-2.19081916809082, coordinate3=
+    -0.626421922445297, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[160])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.28879956305027, coordinate2=-0.511855506896973, coordinate3=
+    -2.4167368888855, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[161])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.850830221176147, coordinate2=2.27247190475464, coordinate3=
+    0.671669912338257, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[162])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.812440407276154, coordinate2=2.00210573673248, coordinate3=
+    -0.756291675567627, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[163])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -0.869199299812317, coordinate2=-2.20523521900177, coordinate3=
+    0.47551776766777, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[164])
+mdb.models['Simulation_4'].parts['circle'].editNode(coordinate1=
+    -1.14954575300217, coordinate2=1.34205124378204, coordinate3=
+    1.96837031841278, nodes=
+    mdb.models['Simulation_4'].parts['circle'].nodes[165])
+mdb.Job(model='Simulation_4', name='Simulation_Job_4')
+mdb.jobs['Simulation_Job_4'].submit()
+mdb.jobs['Simulation_Job_4'].waitForCompletion()
+# Save by Anna on 2025_06_27-14.40.06; build 2024 2023_09_21-14.55.25 RELr426 190762

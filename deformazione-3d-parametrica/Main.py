@@ -25,9 +25,9 @@ def Main():
     ALPHA_Y_RANGE = [0, 60]             # DEGREE
     ALPHA_X_RANGE = [-180, 180]
 
-    SIMULATIONS_TOT = 250
+    SIMULATIONS_TOT = 5000
 
-    idx_start = 0
+    idx_start = 4650
 
     # NOTA:
     # SIMULATION_TIME = tempo impiegato ad eseguire la simulazione
