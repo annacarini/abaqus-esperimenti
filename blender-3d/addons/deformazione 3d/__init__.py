@@ -40,7 +40,11 @@ import numpy as np
 import torch
 
 # Classi e funzioni per ML definite negli altri file
+#from .ML_utils import *
+#from .ML_model import *
+
 from .ML_model import *
+from .ML_model import Transformer2DPointsModel
 from .ML_utils import *
 
 
@@ -50,7 +54,9 @@ from .ML_utils import *
 
 
 # PATH vari
-PATH_WEIGHTS = "D:\\TESI\\Blender scripts\\model_weights.pth"
+PATH_WEIGHTS = "C:\\Users\\Anna\\Documents\\GitHub\\abaqus-esperimenti\\blender-3d\\addons\\model_state_dict.pth"
+PATH_MODEL = "C:\\Users\\Anna\\Documents\\GitHub\\abaqus-esperimenti\\blender-3d\\addons\\full_model.pth"
+PATH_NORM_VALUES = "C:\\Users\\Anna\\Documents\\GitHub\\abaqus-esperimenti\\blender-3d\\addons\\saved_dictionary_3D.pkl"
 
 
 # PARAMETRI
@@ -95,8 +101,6 @@ CIRCLE_DEFAULT_POSITION = (CIRCLE_DEFAULT_POSITION_X, CIRCLE_DEFAULT_POSITION_Z,
 
 
 
-# TEMP
-displacementsFilename = "C:\\Users\\Anna\\Documents\\GitHub\\abaqus-esperimenti\\blender-3d\\addons\\output_displacement_external.csv"
 
 
 
@@ -120,28 +124,56 @@ def load_handler(dummy):
     bpy.context.scene.simulation_properties.reset()
     bpy.context.scene.machine_learning_properties.initialize()
 
-    '''
-    # Crea modello ML
-    print("creating model")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    input_seq_len = 72
-    input_dim = 4  # Each input is a sequence of 2Dx2 points (x, y)
-    d_model = 512  # Embedding dimension
-    nhead = 4  # Number of attention heads
-    num_encoder_layers = 4  # Number of transformer encoder layers
-    dim_feedforward = 512  # Feedforward network dimension
-    output_dim = 280  # Each output is a 2D point (x, y)
-    dropout = 0.0
-    TRANSFORMER_MODEL = Transformer2DPointsModel(input_dim, input_seq_len, d_model, nhead, num_encoder_layers, dim_feedforward, output_dim, dropout).to(device)
-    print("model created, loading weights")
-    TRANSFORMER_MODEL.load_state_dict(torch.load(PATH_WEIGHTS, weights_only=True, map_location=torch.device('cpu')))
-    print("weights loaded")
-    '''
+    # Crea modello pytorch
+    MachineLearningSingletonClass()
+
 
 
 bpy.app.handlers.load_post.append(load_handler)
 
 
+
+#****** Classe singleton per avere un'unica istanza del modello pytorch accessibile ovunque ******#
+
+
+class MachineLearningSingletonClass(object):
+  
+    model = None
+
+    def getModel(self):
+        return self.model
+
+
+    def initModel(self):
+
+        print("creating model")
+
+        if torch.cuda.is_available():
+            device = "cuda"
+        else:
+            device = "cpu"
+
+        input_seq_len = 98 #72
+        input_dim = 6 #4  # Each input is a sequence of 2Dx2 points (x, y)
+        d_model = 512  # Embedding dimension
+        nhead = 4  # Number of attention heads
+        num_encoder_layers = 4  # Number of transformer encoder layers
+        dim_feedforward = 512  # Feedforward network dimension
+        output_dim = 9078 #280  # Each output is a 2D point (x, y)
+        dropout = 0.0
+
+        self.model = Transformer2DPointsModel(input_dim, input_seq_len, d_model, nhead, num_encoder_layers, dim_feedforward, output_dim, dropout).to(device)
+
+        # Carica i pesi
+        self.model.load_state_dict(torch.load(PATH_WEIGHTS, weights_only=True, map_location=torch.device(device)))
+
+        print("weights loaded")
+
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(MachineLearningSingletonClass, cls).__new__(cls)
+            cls.instance.initModel()
+        return cls.instance
 
 
 #******************* PROPERTIES *******************#
@@ -192,6 +224,7 @@ class FloatValuePropertiesGroup(bpy.types.PropertyGroup):
     val : bpy.props.FloatProperty()
 
 
+
 class MachineLearningProperties(bpy.types.PropertyGroup):
 
     
@@ -205,6 +238,7 @@ class MachineLearningProperties(bpy.types.PropertyGroup):
         type = FloatValuePropertiesGroup
     )
 
+
     def setMean(self, values):
         for v in values:
             fl = self.mean.add()
@@ -213,6 +247,7 @@ class MachineLearningProperties(bpy.types.PropertyGroup):
     def getMean(self):
         return [m.val for m in self.mean]
     
+
     def setStd(self, values):
         for v in values:
             fl = self.std.add()
@@ -220,21 +255,16 @@ class MachineLearningProperties(bpy.types.PropertyGroup):
 
     def getStd(self):
         return [m.val for m in self.std]
-
+    
 
     def initialize(self):
+        # inizializza mean e std
         self.mean.clear()
         self.std.clear()
-        with open('D:\\TESI\\Blender scripts\\norm_values.pkl', 'rb') as input_file:
+        with open(PATH_NORM_VALUES, 'rb') as input_file:
             norm_values = pickle.load(input_file)   
-            #print("norm values:")
-            #print(norm_values)
-
             self.setMean(norm_values["mean"])
             self.setStd(norm_values["std"])
-
-            #print("mean:")
-            #print(self.getMean())
 
 
 
@@ -248,10 +278,16 @@ class OT_print_properties(bpy.types.Operator):
     bl_idname = "mesh.print_properties"
     bl_label = "Print"
 
+
     def execute(self, context):
         print("Velocity: " + str(context.scene.simulation_properties.velocity))
-        print("Angle: " + str(context.scene.simulation_properties.alpha))
+        print("Angle Y: " + str(context.scene.simulation_properties.alpha_y))
+        print("Angle X: " + str(context.scene.simulation_properties.alpha_x))
         print("Radius: " + str(context.scene.simulation_properties.radius))
+
+        print("pytorch model:")
+        print(MachineLearningSingletonClass().getModel())
+
         return {"FINISHED"}
 
 
@@ -321,7 +357,7 @@ class OT_play_animation(bpy.types.Operator):
 
     def __init__(self):
 
-        print("creating model")
+        #print("creating model")
 
         if torch.cuda.is_available():
             self.device = "cuda"
@@ -330,14 +366,15 @@ class OT_play_animation(bpy.types.Operator):
             self.device = "cpu"
             self.using_cuda = False
 
+        '''
         # Crea modello ML
-        self.input_seq_len = 72
-        input_dim = 4  # Each input is a sequence of 2Dx2 points (x, y)
+        self.input_seq_len = 98 #72
+        input_dim = 6 #4  # Each input is a sequence of 2Dx2 points (x, y)
         d_model = 512  # Embedding dimension
         nhead = 4  # Number of attention heads
         num_encoder_layers = 4  # Number of transformer encoder layers
         dim_feedforward = 512  # Feedforward network dimension
-        output_dim = 280  # Each output is a 2D point (x, y)
+        output_dim = 9078 #280  # Each output is a 2D point (x, y)
         dropout = 0.0
         self.model = Transformer2DPointsModel(input_dim, self.input_seq_len, d_model, nhead, num_encoder_layers, dim_feedforward, output_dim, dropout).to(self.device)
         
@@ -347,16 +384,8 @@ class OT_play_animation(bpy.types.Operator):
         self.model.load_state_dict(torch.load(PATH_WEIGHTS, weights_only=True, map_location=torch.device('cpu')))
 
         print("weights loaded")
-
-
-        # TEMP: carico i displacement da file
-        self.displacements = []
-        with open(displacementsFilename, mode="r") as displacementsFile:
-            reader = csv.reader(displacementsFile)
-            next(reader) #skip header
-            #line e' cosi': [Id, X_Disp, Y_Disp, Z_Disp], in blender la z e' l'asse verticale di default quindi inverto y e z
-            for line in reader:
-                self.displacements.append((float(line[1]), float(line[3]), float(line[2])))
+        '''
+        #self.model = bpy.data.objects[PLATE_OBJECT_NAME].data["machine_learning_model"]
 
 
     def modal(self, context, event):
@@ -381,29 +410,22 @@ class OT_play_animation(bpy.types.Operator):
                     self.has_collided = True
                     print("applying displacement on frame " + str(self.next_frame))
 
-
-                    '''
                     # trasformo coordinate in tensore
                     if (FPS == 60):
                         init_coords_circle_data = np.array(self.circle_prev_coordinates_3) 
                     else:
                         init_coords_circle_data = np.array(self.circle_prev_coordinates_2)             
-                    #print("init coords circle data")
-                    #print(init_coords_circle_data)
+
                     init_coords_circle_data = torch.tensor(init_coords_circle_data).float()
 
                     if (FPS == 60):
                         before_coords_data = np.array(self.circle_prev_coordinates_1) 
                     else:
                         before_coords_data = np.array(self.circle_prev_coordinates_1)  
-                    #print("before coords circle data")
-                    #print(before_coords_data)
+
                     before_coords_data = torch.tensor(before_coords_data).float()
 
                     total_data = torch.cat((init_coords_circle_data,before_coords_data),1)
-                    padding = self.input_seq_len
-                    if padding is not None:
-                        total_data = zero_pad_tensor(total_data,target_size=padding)
                     
                     images = total_data
                     images = images.to(self.device)
@@ -420,9 +442,9 @@ class OT_play_animation(bpy.types.Operator):
                         "std":context.scene.machine_learning_properties.getStd()
                     }
                     predicted_displacements = denormalize_targets(predicted_displacements,norm_values)
-                    
+
                     predicted_displacements = predicted_displacements.cpu().detach().numpy()
-                    predicted_displacements = predicted_displacements.reshape(-1,2)
+                    predicted_displacements = predicted_displacements.reshape(-1,3)
 
                     #print("predicted displacements:")
                     #print(predicted_displacements)
@@ -431,16 +453,8 @@ class OT_play_animation(bpy.types.Operator):
                     i = 0
                     for val in predicted_displacements:
                         plate.data.vertices[i].co.x += float(val[0])/SCALING_PARAMETER
+                        plate.data.vertices[i].co.y += float(val[2])/SCALING_PARAMETER
                         plate.data.vertices[i].co.z += float(val[1])/SCALING_PARAMETER
-                        i += 1
-                    '''
-                    
-                    # TEMP: applico i displacement da file
-                    i = 0
-                    for val in self.displacements:
-                        plate.data.vertices[i].co.x += float(val[0])/SCALING_PARAMETER
-                        plate.data.vertices[i].co.y += float(val[1])/SCALING_PARAMETER
-                        plate.data.vertices[i].co.z += float(val[2])/SCALING_PARAMETER
                         i += 1
 
 
@@ -472,6 +486,10 @@ class OT_play_animation(bpy.types.Operator):
     def execute(self, context):
         self.reset(context)
         self.has_collided = False
+
+        self.model = MachineLearningSingletonClass().getModel()
+        print("modello dentro execute di play animation:")
+        print(self.model)
 
         circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
 
@@ -637,7 +655,6 @@ def register():
 
     # Crea proprieta' simulazione
     bpy.types.Scene.simulation_properties = bpy.props.PointerProperty(type=SimulationProperties)
-    #bpy.types.Scene.simulation_properties = bpy.props.CollectionProperty(type=SimulationProperties)
     
     # Crea proprieta' machine learning
     bpy.types.Scene.machine_learning_properties = bpy.props.PointerProperty(type=MachineLearningProperties)
@@ -660,20 +677,6 @@ def unregister():
 
 
 if __name__ == "__main__":
-
-    '''
-    # Crea modello ML
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    input_seq_len = 72
-    input_dim = 4  # Each input is a sequence of 2Dx2 points (x, y)
-    d_model = 512  # Embedding dimension
-    nhead = 4  # Number of attention heads
-    num_encoder_layers = 4  # Number of transformer encoder layers
-    dim_feedforward = 512  # Feedforward network dimension
-    output_dim = 280  # Each output is a 2D point (x, y)
-    dropout = 0.0
-    model = Transformer2DPointsModel(input_dim, input_seq_len, d_model, nhead, num_encoder_layers, dim_feedforward, output_dim, dropout).to(device)
-    '''
 
     register()
 
