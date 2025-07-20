@@ -33,18 +33,24 @@ print(python_exec())
 import bpy
 from bpy.app.handlers import persistent
 import addon_utils
+import functools
+import mathutils
 
+import time
 import math
 import pickle
 import numpy as np
 import torch
+
+import copy
+
+import threading
 
 # Classi e funzioni per ML definite negli altri file
 #from .ML_utils import *
 #from .ML_model import *
 
 from .ML_model import *
-from .ML_model import Transformer2DPointsModel
 from .ML_utils import *
 
 
@@ -65,7 +71,6 @@ PLATE_OBJECT_NAME = "plate"
 CIRCLE_DEFAULT_RADIUS = 2.5     # Cosi' lo scaling del cerchio lo calcoliamo in base a questo valore di default
 TIME_TO_IMPACT = 0.5                # Quanti secondi vogliamo che ci metta la palla a raggiungere la lastra
 TIME_TOTAL = 1                  # Quanti secondi vogliamo che duri l'animazione
-FPS = 60
 
 MARGIN_TRAJECTORY = 0.01       # margine che aggiungo alla traiettoria e che uso nel controllo della collisione
 
@@ -76,19 +81,19 @@ SCALING_PARAMETER = 10
 
 # Custom properties
 CIRCLE_VELOCITY_PROPERTY_NAME = "velocity"
-CIRCLE_VELOCITY_DEFAULT_VALUE = 4000
+CIRCLE_VELOCITY_DEFAULT_VALUE = 9591 #4000
 CIRCLE_VELOCITY_RANGE = [3000, 10000]
 
 CIRCLE_ALPHA_Y_PROPERTY_NAME = "alpha_y"
-CIRCLE_ALPHA_Y_DEFAULT_VALUE = 0
+CIRCLE_ALPHA_Y_DEFAULT_VALUE = 9 #0
 CIRCLE_ALPHA_Y_RANGE = [0, 60]  
 
 CIRCLE_ALPHA_X_PROPERTY_NAME = "alpha_x"
-CIRCLE_ALPHA_X_DEFAULT_VALUE = 0
+CIRCLE_ALPHA_X_DEFAULT_VALUE = -58 #0
 CIRCLE_ALPHA_X_RANGE = [-180, 180]  
 
 CIRCLE_RADIUS_PROPERTY_NAME = "radius"
-CIRCLE_RADIUS_DEFAULT_VALUE = 3.0
+CIRCLE_RADIUS_DEFAULT_VALUE = 2.5 #4.46     # Questo valore deve essere SEMPRE 2.5 perche' e' lo stesso usato in Abaqus per calcolare gli scaling
 CIRCLE_RADIUS_RANGE = [2, 4.5]
 
 # Posiz iniziale coi valori di default (nota: in Blender, l'asse verticale e' la Z)
@@ -148,10 +153,12 @@ class MachineLearningSingletonClass(object):
 
         print("creating model")
 
-        if torch.cuda.is_available():
+        if False: #torch.cuda.is_available():
+            print("cuda available")
             device = "cuda"
         else:
             device = "cpu"
+        #device = "cpu"
 
         input_seq_len = 98 #72
         input_dim = 6 #4  # Each input is a sequence of 2Dx2 points (x, y)
@@ -210,6 +217,10 @@ class SimulationProperties(bpy.types.PropertyGroup):
         min = CIRCLE_RADIUS_RANGE[0],
         max = CIRCLE_RADIUS_RANGE[1],
         step=0.1
+    )
+
+    fps60: bpy.props.BoolProperty(
+        default = False
     )
 
     def reset(self):
@@ -335,7 +346,9 @@ class OT_play_animation(bpy.types.Operator):
 
     _timer = None
 
-    next_frame = 1      # cosi' ricomincio poi da 1
+    fps = 30
+
+    next_frame = 0      # cosi' ricomincio poi da 1
 
     # Per il movimento della palla
     displacement_x = 0
@@ -357,40 +370,19 @@ class OT_play_animation(bpy.types.Operator):
 
     def __init__(self):
 
-        #print("creating model")
-
-        if torch.cuda.is_available():
+        if False: #torch.cuda.is_available():
             self.device = "cuda"
             self.using_cuda = True
+            print("using cuda!")
         else:
             self.device = "cpu"
             self.using_cuda = False
 
-        '''
-        # Crea modello ML
-        self.input_seq_len = 98 #72
-        input_dim = 6 #4  # Each input is a sequence of 2Dx2 points (x, y)
-        d_model = 512  # Embedding dimension
-        nhead = 4  # Number of attention heads
-        num_encoder_layers = 4  # Number of transformer encoder layers
-        dim_feedforward = 512  # Feedforward network dimension
-        output_dim = 9078 #280  # Each output is a 2D point (x, y)
-        dropout = 0.0
-        self.model = Transformer2DPointsModel(input_dim, self.input_seq_len, d_model, nhead, num_encoder_layers, dim_feedforward, output_dim, dropout).to(self.device)
-        
-        print("model created, loading weights")
-
-        # Carica i pesi
-        self.model.load_state_dict(torch.load(PATH_WEIGHTS, weights_only=True, map_location=torch.device('cpu')))
-
-        print("weights loaded")
-        '''
-        #self.model = bpy.data.objects[PLATE_OBJECT_NAME].data["machine_learning_model"]
 
 
     def modal(self, context, event):
-        if event.type in {'RIGHTMOUSE', 'ESC'} or self.next_frame > TIME_TOTAL*FPS:
-            self.next_frame = 1
+        if event.type in {'RIGHTMOUSE', 'ESC'} or self.next_frame > TIME_TOTAL*self.fps:
+            self.next_frame = 0
             self.cancel(context)
             return {'FINISHED'}
 
@@ -405,24 +397,22 @@ class OT_play_animation(bpy.types.Operator):
             # se c'e' la collisione
             if ( (not self.has_collided) and self.checkCollision(context)):
 
+                print(f"{context.scene.simulation_properties.velocity}, {context.scene.simulation_properties.radius}, {context.scene.simulation_properties.alpha_y}, {context.scene.simulation_properties.alpha_x}")
+                
                 with torch.autograd.profiler.profile(use_cuda=self.using_cuda) as prof:
 
                     self.has_collided = True
-                    print("applying displacement on frame " + str(self.next_frame))
+                    print(f"collision on frame {self.next_frame}")
 
                     # trasformo coordinate in tensore
-                    if (FPS == 60):
+                    if (self.fps == 60):
                         init_coords_circle_data = np.array(self.circle_prev_coordinates_3) 
-                    else:
-                        init_coords_circle_data = np.array(self.circle_prev_coordinates_2)             
-
-                    init_coords_circle_data = torch.tensor(init_coords_circle_data).float()
-
-                    if (FPS == 60):
                         before_coords_data = np.array(self.circle_prev_coordinates_1) 
                     else:
-                        before_coords_data = np.array(self.circle_prev_coordinates_1)  
+                        init_coords_circle_data = np.array(self.circle_prev_coordinates_2)     
+                        before_coords_data = np.array(self.circle_prev_coordinates_1)          
 
+                    init_coords_circle_data = torch.tensor(init_coords_circle_data).float()
                     before_coords_data = torch.tensor(before_coords_data).float()
 
                     total_data = torch.cat((init_coords_circle_data,before_coords_data),1)
@@ -450,16 +440,31 @@ class OT_play_animation(bpy.types.Operator):
                     #print(predicted_displacements)
 
                     # applico i displacement
+                    start = time.time()
                     i = 0
                     for val in predicted_displacements:
                         plate.data.vertices[i].co.x += float(val[0])/SCALING_PARAMETER
                         plate.data.vertices[i].co.y += float(val[2])/SCALING_PARAMETER
                         plate.data.vertices[i].co.z += float(val[1])/SCALING_PARAMETER
                         i += 1
+                    print("time to apply displacements:")
+                    print(time.time() - start)
 
 
-                print("elapsed time:")
-                print(prof)
+                #print("cuda time:")
+                #print(prof)
+
+
+            if (self.next_frame in [15]):
+                print(f"valori giusti delle coordinate del cerchio al frame {self.next_frame}:")
+                if (self.fps == 60):
+                    print(self.circle_prev_coordinates_3[:3])
+                    print(self.circle_prev_coordinates_1[:3]) 
+                else:
+                    print(self.circle_prev_coordinates_2[:3])     
+                    print(self.circle_prev_coordinates_1[:3])      
+                #print("circle world matrix:")
+                print(context.scene.objects[CIRCLE_OBJECT_NAME].matrix_world.copy())   
             
 
             # prendo la world matrix dell'oggetto, i vertici vanno moltiplicati per quella se no ottengo
@@ -468,7 +473,7 @@ class OT_play_animation(bpy.types.Operator):
             circle_world_matrix = circle_obj.matrix_world.copy()
 
             # Aggiorna posizioni frame precedenti
-            if (FPS == 60):
+            if (self.fps == 60):
                 self.circle_prev_coordinates_3 = [co for co in self.circle_prev_coordinates_2]
             self.circle_prev_coordinates_2 = [co for co in self.circle_prev_coordinates_1]
 
@@ -487,9 +492,12 @@ class OT_play_animation(bpy.types.Operator):
         self.reset(context)
         self.has_collided = False
 
+        if (context.scene.simulation_properties.fps60):
+            self.fps = 60
+
         self.model = MachineLearningSingletonClass().getModel()
-        print("modello dentro execute di play animation:")
-        print(self.model)
+        #print("modello dentro execute di play animation:")
+        #print(self.model)
 
         circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
 
@@ -514,10 +522,12 @@ class OT_play_animation(bpy.types.Operator):
         # Imposta posizione iniziale cerchio
         circle.location = (circle_origin_x, circle_origin_z, circle_origin_y)
 
+        print(f"initial circle location: {circle.location}")
+
         # Calcola spostamenti
-        self.displacement_y = -velocity*math.cos(math.radians(alpha_y))/FPS
-        self.displacement_x = velocity*math.sin(math.radians(alpha_y)) * math.cos(math.radians(alpha_x)) / FPS      # DA CONTROLLARE
-        self.displacement_z = velocity*math.sin(math.radians(alpha_y)) * math.sin(math.radians(alpha_x)) / FPS      # DA CONTROLLARE
+        self.displacement_y = -velocity*math.cos(math.radians(alpha_y))/self.fps
+        self.displacement_x = velocity*math.sin(math.radians(alpha_y)) * math.cos(math.radians(alpha_x)) / self.fps
+        self.displacement_z = velocity*math.sin(math.radians(alpha_y)) * math.sin(math.radians(alpha_x)) / self.fps
 
         # prendo la world matrix dell'oggetto, i vertici vanno moltiplicati per quella se no ottengo
         # solo le posizioni locali ignorando i displacement e scaling
@@ -536,7 +546,7 @@ class OT_play_animation(bpy.types.Operator):
 
         # Avvia operatore
         wm = context.window_manager
-        self._timer = wm.event_timer_add(time_step=1/FPS, window=context.window)
+        self._timer = wm.event_timer_add(time_step=1/self.fps, window=context.window)
         #self._timer = wm.event_timer_add(time_step=0.5, window=context.window)
         wm.modal_handler_add(self)
         return {'RUNNING_MODAL'}
@@ -561,6 +571,8 @@ class OT_play_animation(bpy.types.Operator):
     def move_circle(self, context, displacement_x, displacement_y, displacement_z):
         circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
 
+        #print(f"circle location before frame {self.next_frame}: {circle.location}")
+
         # Muovi cerchio
         circle.location.x += displacement_x
         circle.location.z += displacement_y
@@ -581,6 +593,406 @@ class OT_play_animation(bpy.types.Operator):
             plate.data.vertices[i].co.x = plate.data[str(i)][0]
             plate.data.vertices[i].co.y = plate.data[str(i)][1]
             plate.data.vertices[i].co.z = plate.data[str(i)][2]
+
+
+
+# Operatore ASYNC per riprodurre l'animazione ed eseguire codice ad ogni frame
+class OT_play_animationAsync(bpy.types.Operator):
+    """Operator which runs itself from a timer"""
+    bl_idname = "wm.play_animation_async"
+    bl_label = "Modal Timer Operator"
+
+    _timer = None
+
+    fps = 30
+
+    next_frame = 0      # cosi' ricomincio poi da 0
+
+    # Displacements calcolati in anticipo
+    predicted_displacements = []
+    displacements_computed = False     # Per sapere se la rete neurale ha fatto
+
+    # Thread in cui calcolo i displacements
+    threadToAwait = None
+
+    # Per il movimento della palla
+    displacement_x = 0
+    displacement_z = 0
+
+    # Per lo scaling
+    circle_scaling = 1  # salvo qua perche' mi serve anche in compute displacements
+    circle_origin_x = 0
+    circle_origin_y = 0
+    circle_origin_z = 0
+
+    has_collided = False
+
+    # Coordinate al frame prima
+    circle_prev_coordinates_1 = []
+
+    # Coordinate due frame prima
+    circle_prev_coordinates_2 = []
+
+    # per quando e' a 60 fps
+    # invece di usare 1 e 2, uso 1 e 3 (non 2 e 4, perche' a 60 fps la collisione viene rilevata 1 frame prima - cioe' mezzo frame prima a 30 FPS,
+    # quindi bisogna sfasarlo di un frame a 60 FPS)
+    circle_prev_coordinates_3 = []
+
+
+    def __init__(self):
+
+        if False: #torch.cuda.is_available():
+            self.device = "cuda"
+            self.using_cuda = True
+            print("using cuda!")
+        else:
+            self.device = "cpu"
+            self.using_cuda = False
+
+
+
+    def modal(self, context, event):
+        if event.type in {'RIGHTMOUSE', 'ESC'} or self.next_frame > TIME_TOTAL*self.fps:
+            self.next_frame = 0
+            self.cancel(context)
+            return {'FINISHED'}
+
+        if event.type == 'TIMER':
+
+            #print(f"frame {self.next_frame}")
+
+            circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
+            plate = bpy.data.objects[PLATE_OBJECT_NAME]
+
+            # muovi cerchio
+            self.move_circle(context, self.displacement_x, self.displacement_y, self.displacement_z)
+
+
+            # se c'e' la collisione
+            if ( (not self.has_collided) and self.checkCollision(context)):
+
+                print(f"{context.scene.simulation_properties.velocity}, {context.scene.simulation_properties.radius}, {context.scene.simulation_properties.alpha_y}, {context.scene.simulation_properties.alpha_x}")
+                
+                self.has_collided = True
+                print(f"collision on frame {self.next_frame}")
+                
+                '''
+                print("valori giusti delle coordinate del cerchio:")
+                if (self.fps == 60):
+                    print(self.circle_prev_coordinates_3[:3])
+                    #print(self.circle_prev_coordinates_1) 
+                else:
+                    print(self.circle_prev_coordinates_2[:3])     
+                    #print(self.circle_prev_coordinates_1)         
+                '''
+                    
+                #print("task to await done:")
+                #print(self.threadToAwait.done())
+
+
+                print("waiting for thread to finish")
+                self.threadToAwait.join()
+                print("thread has finished")
+
+                if (self.displacements_computed):
+
+                    print("applico i displacements")
+                    # applico i displacement
+                    start = time.time()
+                    i = 0
+                    for val in self.predicted_displacements:
+                        plate.data.vertices[i].co.x += float(val[0])/SCALING_PARAMETER
+                        plate.data.vertices[i].co.y += float(val[2])/SCALING_PARAMETER
+                        plate.data.vertices[i].co.z += float(val[1])/SCALING_PARAMETER
+                        i += 1
+                    print("time to apply displacements:")
+                    print(time.time() - start)
+
+                else:
+                    print("displacements non pronti")
+
+
+            if (self.next_frame in [13, 14]):
+                print(f"circle world matrix al frame {self.next_frame}:")
+                print(context.scene.objects[CIRCLE_OBJECT_NAME].matrix_world.copy())   
+
+            elif (self.next_frame in [15]):
+                print(f"valori giusti delle coordinate precedenti del cerchio al frame {self.next_frame}:")
+                if (self.fps == 60):
+                    print(self.circle_prev_coordinates_3[:3])
+                    print(self.circle_prev_coordinates_1[:3]) 
+                else:
+                    print(self.circle_prev_coordinates_2[:3])     
+                    print(self.circle_prev_coordinates_1[:3])      
+
+
+
+            # prendo la world matrix dell'oggetto, i vertici vanno moltiplicati per quella se no ottengo
+            # solo le posizioni locali ignorando i displacement e scaling
+            circle_obj = context.scene.objects[CIRCLE_OBJECT_NAME]
+            circle_world_matrix = circle_obj.matrix_world.copy()
+
+            # Aggiorna posizioni frame precedenti
+            if (self.fps == 60):
+                #self.circle_prev_coordinates_3 = [co for co in self.circle_prev_coordinates_2]
+                self.circle_prev_coordinates_3 = copy.deepcopy(self.circle_prev_coordinates_2)
+            #self.circle_prev_coordinates_2 = [co for co in self.circle_prev_coordinates_1]
+            self.circle_prev_coordinates_2 = copy.deepcopy(self.circle_prev_coordinates_1)
+
+            self.circle_prev_coordinates_1 = []
+            for vert in circle.data.vertices:
+                vert_global = circle_world_matrix @ vert.co
+                # inverto la y e la z perche' in blender la z e' l'asse verticale, quello che in abaqus era la y
+                # e moltiplico le coordinate per lo scaling parameter perche' prima le avevo divise
+                self.circle_prev_coordinates_1.append([vert_global[0]*SCALING_PARAMETER, vert_global[2]*SCALING_PARAMETER, vert_global[1]*SCALING_PARAMETER])
+
+            self.next_frame += 1
+
+        return {'PASS_THROUGH'}
+
+
+
+    def execute(self, context):
+        self.reset(context)
+        self.has_collided = False
+
+        #print(f"fps valore {context.scene.simulation_properties.fps60}")
+        if (context.scene.simulation_properties.fps60):
+            self.fps = 60
+
+        self.model = MachineLearningSingletonClass().getModel()
+        #print("modello dentro execute di play animation:")
+        #print(self.model)
+
+        circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
+
+        # Valori velocita' raggio e angolo
+        velocity = context.scene.simulation_properties.velocity / SCALING_PARAMETER
+        alpha_y = context.scene.simulation_properties.alpha_y
+        alpha_x = context.scene.simulation_properties.alpha_x
+        radius = context.scene.simulation_properties.radius / SCALING_PARAMETER
+
+        # Applica scaling al cerchio
+        self.circle_scaling = context.scene.simulation_properties.radius / CIRCLE_RADIUS_DEFAULT_VALUE
+        circle.scale = (self.circle_scaling, self.circle_scaling, self.circle_scaling)
+
+        # Lunghezza traiettoria
+        trajectory = abs(TIME_TO_IMPACT * velocity) + radius #+ MARGIN_TRAJECTORY
+
+        # Posiz iniziale
+        self.circle_origin_y = trajectory * math.cos(math.radians(alpha_y)) + radius
+        self.circle_origin_x = - trajectory * math.sin(math.radians(alpha_y)) * math.cos(math.radians(alpha_x))
+        self.circle_origin_z = - trajectory * math.sin(math.radians(alpha_y)) * math.sin(math.radians(alpha_x))
+
+        # Imposta posizione iniziale cerchio
+        circle.location = (self.circle_origin_x, self.circle_origin_z, self.circle_origin_y)
+
+        # Calcola spostamenti
+        self.displacement_y = -velocity*math.cos(math.radians(alpha_y)) / self.fps
+        self.displacement_x = velocity*math.sin(math.radians(alpha_y)) * math.cos(math.radians(alpha_x)) / self.fps
+        self.displacement_z = velocity*math.sin(math.radians(alpha_y)) * math.sin(math.radians(alpha_x)) / self.fps
+
+
+        # prendo la world matrix dell'oggetto, i vertici vanno moltiplicati per quella se no ottengo
+        # solo le posizioni locali ignorando i displacement e scaling
+        circle_obj = context.scene.objects[CIRCLE_OBJECT_NAME]
+        circle_world_matrix = circle_obj.matrix_world.copy()
+
+
+        # Calcolo in parallelo i displacements
+        print("chiamo compute displacements")
+        self.threadToAwait = threading.Thread(
+            target=self.computeDisplacements,
+            args=(context, self.displacement_x, self.displacement_y, self.displacement_z)
+        )
+        self.threadToAwait.start()
+        #self.threadToAwait.join()
+
+
+        # Inizializza posizioni frame precedenti
+        self.circle_prev_coordinates_1 = []
+        for vert in circle.data.vertices:
+            vert_global = circle_world_matrix @ vert.co
+            self.circle_prev_coordinates_1.append([vert_global[0]*SCALING_PARAMETER, vert_global[2]*SCALING_PARAMETER, vert_global[1]*SCALING_PARAMETER])
+        
+        self.circle_prev_coordinates_2 = copy.deepcopy(self.circle_prev_coordinates_1)
+        self.circle_prev_coordinates_3 = copy.deepcopy(self.circle_prev_coordinates_1)
+
+        # Avvia operatore
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(time_step=1/self.fps, window=context.window)
+        wm.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+
+    def cancel(self, context):
+        wm = context.window_manager
+        wm.event_timer_remove(self._timer)
+
+
+    def computeDisplacements(self, context, displacement_x, displacement_y, displacement_z):
+
+        # i vertici iniziali della palla li passo in input per evitare che siano gia' stati spostati quando questa
+        # funzione asincrona viene eseguita
+
+        # a 60 FPS la collisione e' sempre al frame 30 quindi le posizioni della palla da passare in input sono quelle ai frame 27 e 29
+        # a 30 FPS la collisione e' sempre al frame 15 quindi le posizioni della palla da passare in input sono quelle ai frame 13 e 14
+
+        circle_input_coordinates_1 = []
+        circle_input_coordinates_2 = []
+
+        circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
+
+        #circle_world_matrix_1 = context.scene.objects[CIRCLE_OBJECT_NAME].matrix_world.copy()
+        #circle_world_matrix_2 = context.scene.objects[CIRCLE_OBJECT_NAME].matrix_world.copy()
+
+        circle_world_matrix_1 = mathutils.Matrix()      # senza parametri genera una matrice identita' 4x4
+        circle_world_matrix_2 = mathutils.Matrix()
+
+        # levo il raggio
+        #circle_world_matrix_1[2][3] -= context.scene.simulation_properties.radius # * 2
+        #circle_world_matrix_2[2][3] -= context.scene.simulation_properties.radius # * 2
+
+
+        # metto la posizione iniziale
+        circle_world_matrix_1[0][3] = self.circle_origin_x
+        circle_world_matrix_1[1][3] = self.circle_origin_z
+        circle_world_matrix_1[2][3] = self.circle_origin_y
+
+        circle_world_matrix_2[0][3] = self.circle_origin_x
+        circle_world_matrix_2[1][3] = self.circle_origin_z
+        circle_world_matrix_2[2][3] = self.circle_origin_y
+
+
+        print("world matrix prima di spostamenti previsti:")
+        print(circle_world_matrix_1)
+
+        incr_1 = 13
+        incr_2 = 14
+        if (self.fps == 60):
+            incr_1 = 27
+            incr_2 = 29
+        
+        # metto i displacements
+        circle_world_matrix_1[0][3] += displacement_x*incr_1
+        circle_world_matrix_1[1][3] += displacement_z*incr_1
+        circle_world_matrix_1[2][3] += displacement_y*incr_1
+
+        circle_world_matrix_2[0][3] += displacement_x*incr_2
+        circle_world_matrix_2[1][3] += displacement_z*incr_2
+        circle_world_matrix_2[2][3] += displacement_y*incr_2
+
+        # metto lo scaling
+        circle_world_matrix_1[0][0] = self.circle_scaling
+        circle_world_matrix_1[1][1] = self.circle_scaling
+        circle_world_matrix_1[2][2] = self.circle_scaling
+
+        circle_world_matrix_2[0][0] = self.circle_scaling
+        circle_world_matrix_2[1][1] = self.circle_scaling
+        circle_world_matrix_2[2][2] = self.circle_scaling
+
+        
+        print("matrix 1:")
+        print(circle_world_matrix_1)
+        print("matrix 2:")
+        print(circle_world_matrix_2)
+
+        for vert in circle.data.vertices:
+
+            vert_global_1 = circle_world_matrix_1 @ vert.co
+            circle_input_coordinates_1.append([vert_global_1[0]*SCALING_PARAMETER, vert_global_1[2]*SCALING_PARAMETER, vert_global_1[1]*SCALING_PARAMETER])
+
+            vert_global_2 = circle_world_matrix_2 @ vert.co
+            circle_input_coordinates_2.append([vert_global_2[0]*SCALING_PARAMETER, vert_global_2[2]*SCALING_PARAMETER, vert_global_2[1]*SCALING_PARAMETER])
+
+
+
+        print("valori previsti coordinate cerchio:")
+        print(circle_input_coordinates_1[:3])
+        print(circle_input_coordinates_2[:3])
+
+        print("compute displacements, chiamo rete neurale")
+
+        with torch.autograd.profiler.profile(use_cuda=self.using_cuda) as prof:
+            init_coords_circle_data = torch.tensor(circle_input_coordinates_1).float()
+            before_coords_data = torch.tensor(circle_input_coordinates_2).float()
+
+            total_data = torch.cat((init_coords_circle_data,before_coords_data),1)
+            
+            images = total_data
+            images = images.to(self.device)
+            images = images[None, :, :]
+
+            # passo in input alla rete neurale
+            predicted_displacements = self.model(images,None)
+
+            # de-normalizzo:
+            norm_values = {
+                "mean":context.scene.machine_learning_properties.getMean(),
+                "std":context.scene.machine_learning_properties.getStd()
+            }
+            predicted_displacements = denormalize_targets(predicted_displacements,norm_values)
+
+            predicted_displacements = predicted_displacements.cpu().detach().numpy()
+            predicted_displacements = predicted_displacements.reshape(-1,3)
+
+            self.predicted_displacements = predicted_displacements
+
+        
+        #print("cuda time:")
+        #print(prof)
+
+        print(f"compute displacements finito al frame {self.next_frame}")
+
+        self.displacements_computed = True
+        return True
+
+
+    def checkCollision(self, context):
+        circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
+        radius = context.scene.simulation_properties.radius / SCALING_PARAMETER
+
+        if (circle.location.z <= radius + MARGIN_TRAJECTORY):
+            #print("collisione, posizione:")
+            #print(circle.location.z)
+            return True
+        return False
+
+
+    def move_circle(self, context, displacement_x, displacement_y, displacement_z):
+
+        #print(f"moving circle on frame {self.next_frame}, displ_x: {displacement_x}, displ_y: {displacement_y}, displ_z: {displacement_z}")
+
+        circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
+
+        #print(f"circle location before frame {self.next_frame}: {circle.location}")
+
+        # Muovi cerchio
+        circle.location.x += displacement_x
+        circle.location.z += displacement_y
+        circle.location.y += displacement_z
+
+        #print(f"circle location after frame {self.next_frame}: {circle.location}")
+
+
+    def reset(self, context):
+        circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
+        plate = bpy.data.objects[PLATE_OBJECT_NAME]
+
+        # Ripristina scala e posizione iniziali
+        circle.location = CIRCLE_DEFAULT_POSITION
+        circle.scale = (1, 1, 1)
+
+        # Ripristina posizioni nodi della lastra
+        print("resetting plate vertices")
+        for i in range(0, len(plate.data.vertices)):
+            plate.data.vertices[i].co.x = plate.data[str(i)][0]
+            plate.data.vertices[i].co.y = plate.data[str(i)][1]
+            plate.data.vertices[i].co.z = plate.data[str(i)][2]
+
+
+
+
 
 
 #******************* UI *******************#
@@ -620,8 +1032,14 @@ class MainPanel(bpy.types.Panel):
         col.prop(context.scene.simulation_properties, "radius", text="Circle radius", slider=True)
         col.separator()
 
+        # Pulsante 60 FPS
+        col.prop(context.scene.simulation_properties, "fps60", text="60 FPS", toggle=True)
+
+        layout.separator()
+
         # Pulsante stampa
-        col.operator("mesh.print_properties", text="Print values")
+        row = layout.row()
+        row.operator("mesh.print_properties", text="Print values")
 
         layout.separator()
 
@@ -633,6 +1051,10 @@ class MainPanel(bpy.types.Panel):
         # Pulsante play
         row = layout.row()
         row.operator("wm.play_animation", text="Play")
+
+        # Pulsante play 2
+        row = layout.row()
+        row.operator("wm.play_animation_async", text="Play Async")
 
 
 
@@ -651,6 +1073,7 @@ def register():
     bpy.utils.register_class(OT_reset_all)
     bpy.utils.register_class(OT_print_properties)
     bpy.utils.register_class(OT_play_animation)
+    bpy.utils.register_class(OT_play_animationAsync)
 
 
     # Crea proprieta' simulazione
@@ -672,6 +1095,7 @@ def unregister():
     bpy.utils.unregister_class(OT_reset_all)
     bpy.utils.unregister_class(OT_print_properties)
     bpy.utils.unregister_class(OT_play_animation)
+    bpy.utils.unregister_class(OT_play_animationAsync)
 
     print("///// addon deactivated /////")
 

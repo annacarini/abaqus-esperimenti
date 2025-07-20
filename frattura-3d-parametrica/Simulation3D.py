@@ -664,21 +664,9 @@ class Simulation3D():
 
         # SAVING PLATE DISPLACEMENTS
         if SAVEDISPLACEMENT:
-            # solo la frontiera                
-            displacement_external = lastFrame.fieldOutputs['U'].getSubset( region = outputRegionExternal )
-            
-            displacement_external_df = pd.DataFrame( { 'Id'     : [ values.nodeLabel for values in displacement_external.values ],
-                                                        'X_Disp' : [ values.data[0]   for values in displacement_external.values ],
-                                                        'Y_Disp' : [ values.data[1]   for values in displacement_external.values ],
-                                                        'Z_Disp' : [ values.data[2]   for values in displacement_external.values ] } )
-            
-            displacement_external_output_filename = os.path.join( self.new_path, str(self.index) + '_output_displacement_external.csv' )
-
-            displacement_external_df.to_csv( displacement_external_output_filename, index = False )
 
 
-
-        if SAVEREMOVEDEDGES:
+            # Trovo i vertici che perdono un edge
 
             last_frame_inactive_elems = []
             for elemStatus in lastFrame.fieldOutputs['STATUS'].values:
@@ -777,9 +765,27 @@ class Simulation3D():
                 else:
                     plate_surface_vertices_removed_info.append(0)
 
+            '''
             with open(f"{self.index}_plate_surface_vertices_removed_info.txt", mode='wt', encoding='utf-8') as plateVerticesFile:
                 for line in plate_surface_vertices_removed_info:
                     print(line, file = plateVerticesFile)
+            '''
+
+
+            # solo la frontiera                
+            displacement_external = lastFrame.fieldOutputs['U'].getSubset( region = outputRegionExternal )
+            
+            displacement_external_df = pd.DataFrame( { 'Id'     : [ values.nodeLabel for values in displacement_external.values ],
+                                                        'X_Disp' : [ values.data[0]   for values in displacement_external.values ],
+                                                        'Y_Disp' : [ values.data[1]   for values in displacement_external.values ],
+                                                        'Z_Disp' : [ values.data[2]   for values in displacement_external.values ],
+                                                        'Edge_removed' : plate_surface_vertices_removed_info } )
+            
+            displacement_external_output_filename = os.path.join( self.new_path, str(self.index) + '_output_displacement_external.csv' )
+
+            displacement_external_df.to_csv( displacement_external_output_filename, index = False )
+
+
 
 
 
@@ -841,7 +847,7 @@ sim.runSimulation(
     ALPHA_Y         = alpha_Y,
     ALPHA_X         = alpha_X,
     SIMULATION_ID   = idx,
-    SAVEPLATECOORDINATES = False
+    SAVEPLATECOORDINATES = True
 )
 
 #simulation_time = str(time.time() - start)
