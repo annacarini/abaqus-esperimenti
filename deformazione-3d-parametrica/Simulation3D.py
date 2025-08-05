@@ -698,12 +698,12 @@ class Simulation3D():
 
 
 
-'''
+#'''
 ########## DA TOGLIERE ##########
 
-idx = 3
-radius = 4.5
-velocity = 8000
+idx = 0
+radius = 3.0
+velocity = 4000
 alpha_Y = 0 #38
 alpha_X = 0 #-180
 
@@ -715,7 +715,7 @@ sim = Simulation3D()
     CIRCLE_VELOCITY = velocity,
     ALPHA_Y         = alpha_Y,
     ALPHA_X         = alpha_X,
-    SUMULATION_ID   = idx,
+    SIMULATION_ID   = idx,
     SAVEPLATECOORDINATES = True
 )
 
@@ -724,4 +724,4 @@ simulation_time = str(time.time() - start)
 log("sim length: " + str(simulation_length))
 log("completed: " + str(simulation_completed))
 log("sim total time: " + simulation_time)
-'''
+#'''

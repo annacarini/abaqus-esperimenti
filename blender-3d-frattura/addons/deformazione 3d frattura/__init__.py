@@ -35,10 +35,14 @@ from bpy.app.handlers import persistent
 import addon_utils
 import bmesh
 
+
 import math
+import mathutils
 import pickle
 import numpy as np
 import torch
+
+import copy
 
 # Classi e funzioni per ML definite negli altri file
 from .ML_model import *
@@ -51,7 +55,9 @@ from .ML_utils import *
 
 
 # PATH vari
-PATH_WEIGHTS = "D:\\TESI\\Blender scripts\\model_weights.pth"
+PATH_WEIGHTS = "C:\\Users\\Anna\\Documents\\GitHub\\abaqus-esperimenti\\blender-3d-frattura\\addons\deformazione 3d frattura\\model_state_dict_frattura.pth"
+PATH_NORM_VALUES_INPUT = "C:\\Users\\Anna\\Documents\\GitHub\\abaqus-esperimenti\\blender-3d-frattura\\addons\deformazione 3d frattura\\input_norm_values.pkl"
+PATH_NORM_VALUES_TARGET = "C:\\Users\\Anna\\Documents\\GitHub\\abaqus-esperimenti\\blender-3d-frattura\\addons\deformazione 3d frattura\\target_norm_values.pkl"
 
 
 # PARAMETRI
@@ -60,7 +66,7 @@ PLATE_OBJECT_NAME = "plate"
 CIRCLE_DEFAULT_RADIUS = 2.5     # Cosi' lo scaling del cerchio lo calcoliamo in base a questo valore di default
 TIME_TO_IMPACT = 0.5                # Quanti secondi vogliamo che ci metta la palla a raggiungere la lastra
 TIME_TOTAL = 1                  # Quanti secondi vogliamo che duri l'animazione
-FPS = 60
+FPS = 30
 
 MARGIN_TRAJECTORY = 0.01       # margine che aggiungo alla traiettoria e che uso nel controllo della collisione
 
@@ -117,26 +123,89 @@ def load_handler(dummy):
     bpy.context.scene.simulation_properties.reset()
     bpy.context.scene.machine_learning_properties.initialize()
 
-    '''
-    # Crea modello ML
-    print("creating model")
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    input_seq_len = 72
-    input_dim = 4  # Each input is a sequence of 2Dx2 points (x, y)
-    d_model = 512  # Embedding dimension
-    nhead = 4  # Number of attention heads
-    num_encoder_layers = 4  # Number of transformer encoder layers
-    dim_feedforward = 512  # Feedforward network dimension
-    output_dim = 280  # Each output is a 2D point (x, y)
-    dropout = 0.0
-    TRANSFORMER_MODEL = Transformer2DPointsModel(input_dim, input_seq_len, d_model, nhead, num_encoder_layers, dim_feedforward, output_dim, dropout).to(device)
-    print("model created, loading weights")
-    TRANSFORMER_MODEL.load_state_dict(torch.load(PATH_WEIGHTS, weights_only=True, map_location=torch.device('cpu')))
-    print("weights loaded")
-    '''
+    # Crea modello pytorch
+    MachineLearningSingletonClass()
+
 
 
 bpy.app.handlers.load_post.append(load_handler)
+
+
+
+
+#****** Classe singleton per avere un'unica istanza del modello pytorch accessibile ovunque ******#
+
+
+class MachineLearningSingletonClass(object):
+  
+    model = None
+
+    norm_values_input = {
+        "mean":[],
+        "std":[]
+    }
+
+    norm_values_target = {
+        "mean":[],
+        "std":[]
+    }
+
+    def getModel(self):
+        return self.model
+
+    def getNormValuesInput(self):
+        return self.norm_values_input
+    
+    def getNormValuesTarget(self):
+        return self.norm_values_target
+    
+    def getInputSeqLength(self):
+        return self.input_seq_len
+
+    def initModel(self):
+
+        print("creating model")
+
+        if False: #torch.cuda.is_available():
+            print("cuda available")
+            self.device = "cuda"
+        else:
+            self.device = "cpu"
+        
+        # Crea modello ML
+        self.input_seq_len = 98
+        input_dim = 6  # Each input is a sequence of 3Dx2 points (x, y, z)
+        d_model = 512  # Embedding dimension
+        nhead = 4  # Number of attention heads
+        num_encoder_layers = 4  # Number of transformer encoder layers
+        dim_feedforward = 512  # Feedforward network dimension
+        n_points = 2738   
+        output_dim = n_points*3  # Each output is a 3D point (x, y, z)
+        dropout = 0.0
+
+        self.model = Transformer3DPointsModel(input_dim, self.input_seq_len, d_model, nhead, num_encoder_layers, dim_feedforward, output_dim, dropout).to(self.device)
+
+        print("model created, loading weights")
+
+        # Carica i pesi
+        self.model.load_state_dict(torch.load(PATH_WEIGHTS, weights_only=True, map_location=torch.device('cpu')))
+
+        print("weights loaded")
+
+    def initNormValues(self):
+        print("getting norm values")
+        with open(PATH_NORM_VALUES_INPUT, 'rb') as input_file:
+            self.norm_values_input = pickle.load(input_file)   
+        with open(PATH_NORM_VALUES_TARGET, 'rb') as input_file:
+            self.norm_values_target = pickle.load(input_file)   
+        print("set norm values")
+
+    def __new__(cls):
+        if not hasattr(cls, 'instance'):
+            cls.instance = super(MachineLearningSingletonClass, cls).__new__(cls)
+            cls.instance.initModel()
+            cls.instance.initNormValues()
+        return cls.instance
 
 
 
@@ -247,8 +316,13 @@ class OT_print_properties(bpy.types.Operator):
 
     def execute(self, context):
         print("Velocity: " + str(context.scene.simulation_properties.velocity))
-        print("Angle: " + str(context.scene.simulation_properties.alpha))
+        print("Angle Y: " + str(context.scene.simulation_properties.alpha_y))
+        print("Angle X: " + str(context.scene.simulation_properties.alpha_x))
         print("Radius: " + str(context.scene.simulation_properties.radius))
+
+        print("pytorch model:")
+        print(MachineLearningSingletonClass().getModel())
+
         return {"FINISHED"}
 
 
@@ -296,11 +370,18 @@ class OT_play_animation(bpy.types.Operator):
 
     _timer = None
 
-    next_frame = 1      # cosi' ricomincio poi da 1
+    next_frame = 0      # cosi' ricomincio poi da 1
 
     # Per il movimento della palla
     displacement_x = 0
+    displacement_y = 0
     displacement_z = 0
+
+    # Per lo scaling
+    circle_scaling = 1  # salvo qua perche' mi serve anche in compute displacements
+    circle_origin_x = 0
+    circle_origin_y = 0
+    circle_origin_z = 0
 
     has_collided = False
 
@@ -316,47 +397,23 @@ class OT_play_animation(bpy.types.Operator):
     circle_prev_coordinates_3 = []
 
 
+    circle_prev_coordinates_1_precomputed = []
+    circle_prev_coordinates_2_precomputed = []
+
+
     def __init__(self):
 
-        print("creating model")
-
-        if torch.cuda.is_available():
+        if False: #torch.cuda.is_available():
             self.device = "cuda"
             self.using_cuda = True
+            print("using cuda!")
         else:
             self.device = "cpu"
             self.using_cuda = False
 
-        # Crea modello ML
-        self.input_seq_len = 72
-        input_dim = 4  # Each input is a sequence of 2Dx2 points (x, y)
-        d_model = 512  # Embedding dimension
-        nhead = 4  # Number of attention heads
-        num_encoder_layers = 4  # Number of transformer encoder layers
-        dim_feedforward = 512  # Feedforward network dimension
-        output_dim = 280  # Each output is a 2D point (x, y)
-        dropout = 0.0
-        self.model = Transformer2DPointsModel(input_dim, self.input_seq_len, d_model, nhead, num_encoder_layers, dim_feedforward, output_dim, dropout).to(self.device)
-        
-        print("model created, loading weights")
-
-        # Carica i pesi
-        self.model.load_state_dict(torch.load(PATH_WEIGHTS, weights_only=True, map_location=torch.device('cpu')))
-
-        print("weights loaded")
 
 
         ## ********************************************************************************************************************** ##
-        # TEMP: carico i displacement da file
-        displacementsFilename = "C:\\Users\\Anna\\Documents\\GitHub\\abaqus-esperimenti\\blender-3d-frattura\\addons\\output_displacement_external.csv"
-        self.displacements = []
-        with open(displacementsFilename, mode="r") as displacementsFile:
-            reader = csv.reader(displacementsFile)
-            next(reader) #skip header
-            #line e' cosi': [Id, X_Disp, Y_Disp, Z_Disp], in blender la z e' l'asse verticale di default quindi inverto y e z
-            for line in reader:
-                self.displacements.append((float(line[1]), float(line[3]), float(line[2])))
-
         # TEMP: carico i vertici degli edge rimossi da file
         edgesToRemoveFilename = "C:\\Users\\Anna\\Documents\\GitHub\\abaqus-esperimenti\\blender-3d-frattura\\addons\\plate_surface_vertices_removed_info.txt"
         self.vertices_removed_info = []
@@ -371,7 +428,7 @@ class OT_play_animation(bpy.types.Operator):
 
     def modal(self, context, event):
         if event.type in {'RIGHTMOUSE', 'ESC'} or self.next_frame > TIME_TOTAL*FPS:
-            self.next_frame = 1
+            self.next_frame = 0
             self.cancel(context)
             return {'FINISHED'}
 
@@ -391,60 +448,66 @@ class OT_play_animation(bpy.types.Operator):
                     self.has_collided = True
                     print("applying displacement on frame " + str(self.next_frame))
 
-
-                    '''
-                    # trasformo coordinate in tensore
+                    # prendo coordinate
                     if (FPS == 60):
                         init_coords_circle_data = np.array(self.circle_prev_coordinates_3) 
-                    else:
-                        init_coords_circle_data = np.array(self.circle_prev_coordinates_2)             
-                    #print("init coords circle data")
-                    #print(init_coords_circle_data)
-                    init_coords_circle_data = torch.tensor(init_coords_circle_data).float()
-
-                    if (FPS == 60):
                         before_coords_data = np.array(self.circle_prev_coordinates_1) 
                     else:
-                        before_coords_data = np.array(self.circle_prev_coordinates_1)  
-                    #print("before coords circle data")
-                    #print(before_coords_data)
+                        init_coords_circle_data = np.array(self.circle_prev_coordinates_2)    
+                        before_coords_data = np.array(self.circle_prev_coordinates_1)           
+
+                    ### TEMP
+                    '''
+                    circle_obj = context.scene.objects[CIRCLE_OBJECT_NAME]
+                    circle_world_matrix = circle_obj.matrix_world.copy()
+                    new_before_coords_data = []
+                    for vert in circle.data.vertices:
+                        vert_global = circle_world_matrix @ vert.co
+                        new_before_coords_data.append([vert_global[0]*SCALING_PARAMETER, vert_global[2]*SCALING_PARAMETER, vert_global[1]*SCALING_PARAMETER])
+                    before_coords_data = np.array(new_before_coords_data)  
+                    '''
+                    ###
+
+                    ### TEMP
+                    init_coords_circle_data = np.array(self.circle_prev_coordinates_1_precomputed) 
+                    before_coords_data = np.array(self.circle_prev_coordinates_2_precomputed) 
+                    ###
+
+                    print("init coords circle")
+                    print(init_coords_circle_data[:4])
+                    print("before coords circle")
+                    print(before_coords_data[:4])
+
+                    # trasformo coordinate in tensori
+                    init_coords_circle_data = torch.tensor(init_coords_circle_data).float()
                     before_coords_data = torch.tensor(before_coords_data).float()
 
                     total_data = torch.cat((init_coords_circle_data,before_coords_data),1)
-                    padding = self.input_seq_len
-                    if padding is not None:
+                    padding = MachineLearningSingletonClass().getInputSeqLength()
+                    if (padding is not None) and total_data.shape[0]<padding:
                         total_data = zero_pad_tensor(total_data,target_size=padding)
-                    
-                    images = total_data
-                    images = images.to(self.device)
-                    images = images[None, :, :]
+
+                    # normalizzo:
+                    total_data = normalize_targets(total_data, MachineLearningSingletonClass().getNormValuesInput())
+                    total_data = total_data.to(self.device)
+                    total_data = total_data[None, :, :]
 
                     print("chiamo modello ML")
 
                     # passo in input alla rete neurale
-                    predicted_displacements = self.model(images,None)
+                    predicted_displacements,_ = self.model(total_data,None)
 
                     # de-normalizzo:
-                    norm_values = {
-                        "mean":context.scene.machine_learning_properties.getMean(),
-                        "std":context.scene.machine_learning_properties.getStd()
-                    }
-                    predicted_displacements = denormalize_targets(predicted_displacements,norm_values)
-                    
+                    predicted_displacements = denormalize_targets(predicted_displacements, MachineLearningSingletonClass().getNormValuesTarget())
                     predicted_displacements = predicted_displacements.cpu().detach().numpy()
-                    predicted_displacements = predicted_displacements.reshape(-1,2)
+                    predicted_displacements = predicted_displacements.reshape(-1,3)
 
+                    self.displacements = predicted_displacements
+                    
                     #print("predicted displacements:")
                     #print(predicted_displacements)
 
-                    # applico i displacement
-                    i = 0
-                    for val in predicted_displacements:
-                        plate.data.vertices[i].co.x += float(val[0])/SCALING_PARAMETER
-                        plate.data.vertices[i].co.z += float(val[1])/SCALING_PARAMETER
-                        i += 1
-                    '''
-                    
+
                     ## ********************************************************************************************************************** ##
                     
 
@@ -453,8 +516,8 @@ class OT_play_animation(bpy.types.Operator):
                     i = 0
                     for val in self.displacements:
                         plate.data.vertices[i].co.x += float(val[0])/SCALING_PARAMETER
-                        plate.data.vertices[i].co.y += float(val[1])/SCALING_PARAMETER
-                        plate.data.vertices[i].co.z += float(val[2])/SCALING_PARAMETER
+                        plate.data.vertices[i].co.y += float(val[2])/SCALING_PARAMETER
+                        plate.data.vertices[i].co.z += float(val[1])/SCALING_PARAMETER
                         i += 1
                     #'''
 
@@ -470,7 +533,7 @@ class OT_play_animation(bpy.types.Operator):
 
 
                     # Se non ci sono vertici che perdono un edge, tutta la parte dopo non serve
-                    if (len(plate_vertices_that_lost_an_edge) >= 3):          # 3 perche' rimuovo una faccia solo se almeno 3 suoi vertici sono nella lista
+                    if False: #(len(plate_vertices_that_lost_an_edge) >= 3):          # 3 perche' rimuovo una faccia solo se almeno 3 suoi vertici sono nella lista
 
                         # vertici a cui dovro' ricostruire gli edge
                         plate_vertices_that_need_new_edges = []
@@ -553,8 +616,8 @@ class OT_play_animation(bpy.types.Operator):
 
 
 
-                print("elapsed time:")
-                print(prof)
+                #print("elapsed time:")
+                #print(prof)
             
 
             # prendo la world matrix dell'oggetto, i vertici vanno moltiplicati per quella se no ottengo
@@ -564,8 +627,8 @@ class OT_play_animation(bpy.types.Operator):
 
             # Aggiorna posizioni frame precedenti
             if (FPS == 60):
-                self.circle_prev_coordinates_3 = [co for co in self.circle_prev_coordinates_2]
-            self.circle_prev_coordinates_2 = [co for co in self.circle_prev_coordinates_1]
+                self.circle_prev_coordinates_3 = copy.deepcopy(self.circle_prev_coordinates_2)
+            self.circle_prev_coordinates_2 = copy.deepcopy(self.circle_prev_coordinates_1)
 
             self.circle_prev_coordinates_1 = []
             for vert in circle.data.vertices:
@@ -582,6 +645,8 @@ class OT_play_animation(bpy.types.Operator):
         self.reset(context)
         self.has_collided = False
 
+        self.model = MachineLearningSingletonClass().getModel()
+
         circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
 
         # Valori velocita' raggio e angolo
@@ -591,30 +656,32 @@ class OT_play_animation(bpy.types.Operator):
         radius = context.scene.simulation_properties.radius / SCALING_PARAMETER
 
         # Applica scaling al cerchio
-        circle_scaling = context.scene.simulation_properties.radius / CIRCLE_RADIUS_DEFAULT_VALUE
-        circle.scale = (circle_scaling, circle_scaling, circle_scaling)
+        self.circle_scaling = context.scene.simulation_properties.radius / CIRCLE_DEFAULT_RADIUS
+        circle.scale = (self.circle_scaling, self.circle_scaling, self.circle_scaling)
 
         # Lunghezza traiettoria
         trajectory = abs(TIME_TO_IMPACT * velocity) + radius #+ MARGIN_TRAJECTORY
 
         # Posiz iniziale
-        circle_origin_y = trajectory * math.cos(math.radians(alpha_y)) + radius
-        circle_origin_x = - trajectory * math.sin(math.radians(alpha_y)) * math.cos(math.radians(alpha_x))
-        circle_origin_z = - trajectory * math.sin(math.radians(alpha_y)) * math.sin(math.radians(alpha_x))
-
-        # Imposta posizione iniziale cerchio
-        circle.location = (circle_origin_x, circle_origin_z, circle_origin_y)
+        self.circle_origin_y = trajectory * math.cos(math.radians(alpha_y)) + radius
+        self.circle_origin_x = - trajectory * math.sin(math.radians(alpha_y)) * math.cos(math.radians(alpha_x))
+        self.circle_origin_z = - trajectory * math.sin(math.radians(alpha_y)) * math.sin(math.radians(alpha_x))
 
         # Calcola spostamenti
         self.displacement_y = -velocity*math.cos(math.radians(alpha_y))/FPS
-        self.displacement_x = velocity*math.sin(math.radians(alpha_y)) * math.cos(math.radians(alpha_x)) / FPS      # DA CONTROLLARE
-        self.displacement_z = velocity*math.sin(math.radians(alpha_y)) * math.sin(math.radians(alpha_x)) / FPS      # DA CONTROLLARE
+        self.displacement_x = velocity*math.sin(math.radians(alpha_y)) * math.cos(math.radians(alpha_x)) / FPS
+        self.displacement_z = velocity*math.sin(math.radians(alpha_y)) * math.sin(math.radians(alpha_x)) / FPS
+
+        # TEMP
+        self.preComputeCoordinates(self.displacement_x, self.displacement_y, self.displacement_z)
+
+        # Imposta posizione iniziale cerchio
+        circle.location = (self.circle_origin_x, self.circle_origin_z, self.circle_origin_y)
 
         # prendo la world matrix dell'oggetto, i vertici vanno moltiplicati per quella se no ottengo
         # solo le posizioni locali ignorando i displacement e scaling
         circle_obj = context.scene.objects[CIRCLE_OBJECT_NAME]
         circle_world_matrix = circle_obj.matrix_world.copy()
-
 
         # Inizializza posizioni frame precedenti
         self.circle_prev_coordinates_1 = []
@@ -628,9 +695,71 @@ class OT_play_animation(bpy.types.Operator):
         # Avvia operatore
         wm = context.window_manager
         self._timer = wm.event_timer_add(time_step=1/FPS, window=context.window)
-        #self._timer = wm.event_timer_add(time_step=0.5, window=context.window)
         wm.modal_handler_add(self)
         return {'RUNNING_MODAL'}
+
+
+    def preComputeCoordinates(self, displacement_x, displacement_y, displacement_z):
+        circle = bpy.data.objects[CIRCLE_OBJECT_NAME]
+
+        circle_world_matrix_1 = mathutils.Matrix()      # senza parametri genera una matrice identita' 4x4
+        circle_world_matrix_2 = mathutils.Matrix()
+
+        # metto la posizione iniziale
+        circle_world_matrix_1[0][3] = self.circle_origin_x
+        circle_world_matrix_1[1][3] = self.circle_origin_z
+        circle_world_matrix_1[2][3] = self.circle_origin_y
+
+        circle_world_matrix_2[0][3] = self.circle_origin_x
+        circle_world_matrix_2[1][3] = self.circle_origin_z
+        circle_world_matrix_2[2][3] = self.circle_origin_y
+
+
+        #print("world matrix prima di spostamenti previsti:")
+        #print(circle_world_matrix_1)
+
+        incr_1 = 13
+        incr_2 = 14
+        if (FPS == 60):
+            incr_1 = 27
+            incr_2 = 29
+        
+        # metto i displacements
+        circle_world_matrix_1[0][3] += displacement_x*incr_1
+        circle_world_matrix_1[1][3] += displacement_z*incr_1
+        circle_world_matrix_1[2][3] += displacement_y*incr_1
+
+        circle_world_matrix_2[0][3] += displacement_x*incr_2
+        circle_world_matrix_2[1][3] += displacement_z*incr_2
+        circle_world_matrix_2[2][3] += displacement_y*incr_2
+
+        # metto lo scaling
+        circle_world_matrix_1[0][0] = self.circle_scaling
+        circle_world_matrix_1[1][1] = self.circle_scaling
+        circle_world_matrix_1[2][2] = self.circle_scaling
+
+        circle_world_matrix_2[0][0] = self.circle_scaling
+        circle_world_matrix_2[1][1] = self.circle_scaling
+        circle_world_matrix_2[2][2] = self.circle_scaling
+
+        
+        print("matrix 1:")
+        print(circle_world_matrix_1)
+        print("matrix 2:")
+        print(circle_world_matrix_2)
+
+        for vert in circle.data.vertices:
+
+            vert_global_1 = circle_world_matrix_1 @ vert.co
+            self.circle_prev_coordinates_1_precomputed.append([vert_global_1[0]*SCALING_PARAMETER, vert_global_1[2]*SCALING_PARAMETER, vert_global_1[1]*SCALING_PARAMETER])
+
+            vert_global_2 = circle_world_matrix_2 @ vert.co
+            self.circle_prev_coordinates_2_precomputed.append([vert_global_2[0]*SCALING_PARAMETER, vert_global_2[2]*SCALING_PARAMETER, vert_global_2[1]*SCALING_PARAMETER])
+
+        print("precomputed coordinates 1:")
+        print(self.circle_prev_coordinates_1_precomputed[:4])
+        print("precomputed coordinates 2:")
+        print(self.circle_prev_coordinates_2_precomputed[:4])
 
 
     def cancel(self, context):
@@ -678,11 +807,11 @@ class OT_play_animation(bpy.types.Operator):
 
 
 class MainPanel(bpy.types.Panel):
-    bl_label = "Simulation Options"
-    bl_idname = "ANNA_PT_Simulation_Options_Main_Panel"  # deve essere diverso per ogni classe
+    bl_label = "Frattura 3D"
+    bl_idname = "ANNA_PT_Simulation_Options_Frattura_3D_Main_Panel"  # deve essere diverso per ogni classe
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Simulation Options"
+    bl_category = "Simulation Options - Frattura 3D"
 
     def draw(self, context):
 
@@ -769,21 +898,6 @@ def unregister():
 
 
 if __name__ == "__main__":
-
-    '''
-    # Crea modello ML
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    input_seq_len = 72
-    input_dim = 4  # Each input is a sequence of 2Dx2 points (x, y)
-    d_model = 512  # Embedding dimension
-    nhead = 4  # Number of attention heads
-    num_encoder_layers = 4  # Number of transformer encoder layers
-    dim_feedforward = 512  # Feedforward network dimension
-    output_dim = 280  # Each output is a 2D point (x, y)
-    dropout = 0.0
-    model = Transformer2DPointsModel(input_dim, input_seq_len, d_model, nhead, num_encoder_layers, dim_feedforward, output_dim, dropout).to(device)
-    '''
-
     register()
 
 

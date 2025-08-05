@@ -831,10 +831,10 @@ class Simulation3D():
 
 ########## DA TOGLIERE ##########
 
-'''
-idx = 2
-radius = 4.0
-velocity = 9000
+#'''
+idx = 1
+radius = 3.0
+velocity = 4000
 alpha_Y = 0 #38
 alpha_X = 0 #-180
 
@@ -856,4 +856,4 @@ sim.runSimulation(
 #log("completed: " + str(simulation_completed))
 #log("sim total time: " + simulation_time)
 
-'''
+#'''

@@ -81,19 +81,19 @@ SCALING_PARAMETER = 10
 
 # Custom properties
 CIRCLE_VELOCITY_PROPERTY_NAME = "velocity"
-CIRCLE_VELOCITY_DEFAULT_VALUE = 9591 #4000
+CIRCLE_VELOCITY_DEFAULT_VALUE = 4000
 CIRCLE_VELOCITY_RANGE = [3000, 10000]
 
 CIRCLE_ALPHA_Y_PROPERTY_NAME = "alpha_y"
-CIRCLE_ALPHA_Y_DEFAULT_VALUE = 9 #0
+CIRCLE_ALPHA_Y_DEFAULT_VALUE = 0
 CIRCLE_ALPHA_Y_RANGE = [0, 60]  
 
 CIRCLE_ALPHA_X_PROPERTY_NAME = "alpha_x"
-CIRCLE_ALPHA_X_DEFAULT_VALUE = -58 #0
+CIRCLE_ALPHA_X_DEFAULT_VALUE = 0
 CIRCLE_ALPHA_X_RANGE = [-180, 180]  
 
 CIRCLE_RADIUS_PROPERTY_NAME = "radius"
-CIRCLE_RADIUS_DEFAULT_VALUE = 2.5 #4.46     # Questo valore deve essere SEMPRE 2.5 perche' e' lo stesso usato in Abaqus per calcolare gli scaling
+CIRCLE_RADIUS_DEFAULT_VALUE = 3.0
 CIRCLE_RADIUS_RANGE = [2, 4.5]
 
 # Posiz iniziale coi valori di default (nota: in Blender, l'asse verticale e' la Z)
@@ -508,7 +508,7 @@ class OT_play_animation(bpy.types.Operator):
         radius = context.scene.simulation_properties.radius / SCALING_PARAMETER
 
         # Applica scaling al cerchio
-        circle_scaling = context.scene.simulation_properties.radius / CIRCLE_RADIUS_DEFAULT_VALUE
+        circle_scaling = context.scene.simulation_properties.radius / CIRCLE_DEFAULT_RADIUS
         circle.scale = (circle_scaling, circle_scaling, circle_scaling)
 
         # Lunghezza traiettoria
@@ -773,7 +773,7 @@ class OT_play_animationAsync(bpy.types.Operator):
         radius = context.scene.simulation_properties.radius / SCALING_PARAMETER
 
         # Applica scaling al cerchio
-        self.circle_scaling = context.scene.simulation_properties.radius / CIRCLE_RADIUS_DEFAULT_VALUE
+        self.circle_scaling = context.scene.simulation_properties.radius / CIRCLE_DEFAULT_RADIUS
         circle.scale = (self.circle_scaling, self.circle_scaling, self.circle_scaling)
 
         # Lunghezza traiettoria
@@ -907,9 +907,11 @@ class OT_play_animationAsync(bpy.types.Operator):
 
 
 
-        print("valori previsti coordinate cerchio:")
-        print(circle_input_coordinates_1[:3])
-        print(circle_input_coordinates_2[:3])
+        print("precomputed coordinates 1:")
+        print(circle_input_coordinates_1[:4])
+        print("precomputed coordinates 2:")
+        print(circle_input_coordinates_2[:4])
+
 
         print("compute displacements, chiamo rete neurale")
 
@@ -999,11 +1001,11 @@ class OT_play_animationAsync(bpy.types.Operator):
 
 
 class MainPanel(bpy.types.Panel):
-    bl_label = "Simulation Options"
-    bl_idname = "ANNA_PT_Simulation_Options_Main_Panel"  # deve essere diverso per ogni classe
+    bl_label = "Deformazione 3D"
+    bl_idname = "ANNA_PT_Simulation_Options_Deformazione_3D_Main_Panel"  # deve essere diverso per ogni classe
     bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
-    bl_category = "Simulation Options"
+    bl_category = "Simulation Options - Deformazione 3D"
 
     def draw(self, context):
 

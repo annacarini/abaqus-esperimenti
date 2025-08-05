@@ -26,9 +26,9 @@ def Main():
     ALPHA_X_RANGE = [-180, 180]
     CUBE_ROT_RANGE = [-180, 180]
 
-    SIMULATIONS_TOT = 1500
+    SIMULATIONS_TOT = 5000
 
-    idx_start = 1000
+    idx_start = 4500
 
     # NOTA:
     # SIMULATION_TIME = tempo impiegato ad eseguire la simulazione

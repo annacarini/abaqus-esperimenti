@@ -1,3 +1,4 @@
+
 import os
 import re
 import torch
@@ -9,7 +10,6 @@ from PIL import Image, ImageOps
 import numpy as np
 import pandas as pd
 import csv
-
 
 class AttentionLayer(nn.Module):
     def __init__(self, d_model):
@@ -126,6 +126,74 @@ class SmoothnessLoss(nn.Module):
 
         return self.weight * smoothness_loss
 
+def calculate_input_normalization(dataloader):
+    """
+    Compute global statistics (mean and std) for inputs of shape [B, 98, 6].
+    Returns dict with keys 'mean' and 'std', both of shape [6].
+    """
+    n_samples = 0
+    sum_inputs = None
+    sum_squared_inputs = None
+
+    for batch in dataloader:
+        if len(batch) == 3:
+            inputs, targets, init_data = batch
+        else:
+            inputs, targets, labels, init_data = batch
+
+        inputs = inputs.to(dtype=torch.float64)  # [B, 98, 6]
+
+        if sum_inputs is None:
+            sum_inputs = torch.zeros(inputs.shape[-1], dtype=torch.float64)        # [6]
+            sum_squared_inputs = torch.zeros(inputs.shape[-1], dtype=torch.float64)
+
+        batch_size = inputs.shape[0]
+        n_samples += batch_size * inputs.shape[1]  # account for all points
+
+        # Flatten batch and points: sum over (B * 98), keep last dim
+        sum_inputs += torch.sum(inputs, dim=(0, 1))                # [6]
+        sum_squared_inputs += torch.sum(inputs ** 2, dim=(0, 1))   # [6]
+
+    mean = sum_inputs / n_samples
+    var = (sum_squared_inputs / n_samples) - mean**2
+    var = torch.clamp(var, min=1e-8)
+    std = torch.sqrt(var)
+
+    return {'mean': mean.numpy(), 'std': std.numpy()}
+
+def calculate_input_normalization_per_point(dataloader):
+    """
+    Compute per-point statistics (mean and std) for inputs of shape [B, 98, 6].
+    Returns dict with keys 'mean' and 'std', both of shape [98, 6].
+    """
+    n_samples = 0
+    sum_inputs = None
+    sum_squared_inputs = None
+
+    for batch in dataloader:
+        if len(batch) == 3:
+            inputs, targets, init_data = batch
+        else:
+            inputs, targets, labels, init_data = batch
+
+        inputs = inputs.to(dtype=torch.float64)  # [B, 98, 6]
+
+        if sum_inputs is None:
+            sum_inputs = torch.zeros_like(inputs[0], dtype=torch.float64)        # [98, 6]
+            sum_squared_inputs = torch.zeros_like(inputs[0], dtype=torch.float64)
+
+        batch_size = inputs.shape[0]
+        n_samples += batch_size
+
+        sum_inputs += torch.sum(inputs, dim=0)                # sum over batch → [98, 6]
+        sum_squared_inputs += torch.sum(inputs ** 2, dim=0)   # sum of squares → [98, 6]
+
+    mean = sum_inputs / n_samples
+    var = (sum_squared_inputs / n_samples) - mean**2
+    var = torch.clamp(var, min=1e-8)
+    std = torch.sqrt(var)
+
+    return {'mean': mean.numpy(), 'std': std.numpy()}
 
 def calculate_target_normalization(dataloader):
     """
@@ -138,7 +206,12 @@ def calculate_target_normalization(dataloader):
     sum_squared_targets = None
     
     # Loop through the dataloader to collect statistics
-    for batch_idx, (inputs, targets, init_data) in enumerate(dataloader):
+    for batch_idx, batch in enumerate(dataloader):
+        if len(batch) == 3:
+            inputs, targets, init_data = batch
+            labels = None  # or some default
+        else: # len(batch) == 4:
+            inputs, targets, labels, init_data = batch
         if sum_targets is None:
             # Initialize on first batch - we expect targets to be of shape [batch_size, 100]
             sum_targets = torch.zeros(targets.shape[1], dtype=torch.float64)

@@ -125,6 +125,7 @@ class SmoothnessLoss(nn.Module):
         smoothness_loss = torch.mean(diff_x ** 2 + diff_y ** 2)
 
         return self.weight * smoothness_loss
+
 def calculate_input_normalization(dataloader):
     """
     Compute global statistics (mean and std) for inputs of shape [B, 98, 6].
@@ -193,6 +194,7 @@ def calculate_input_normalization_per_point(dataloader):
     std = torch.sqrt(var)
 
     return {'mean': mean.numpy(), 'std': std.numpy()}
+
 def calculate_target_normalization(dataloader):
     """
     Calculate mean and standard deviation for each of the 100 target dimensions
